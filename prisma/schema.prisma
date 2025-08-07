@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -29,341 +29,415 @@ model User {
   // Relations
   organization    Organization @relation(fields: [organizationId], references: [id])
   organizationId  String
-  reports         Report[]     @relation("ReportAuthor")
-  reportAccess    ReportAccess[]
+  
+  // Audit logs
   auditLogs       AuditLog[]
-  sessions        Session[]
-  collaborations  ReportCollaborator[]
-  comments        Comment[]
-  notifications   Notification[]
-
-}
-
-model Session {
-  id          String   @id @default(cuid())
-  userId      String
-  token       String   @unique
-  expiresAt   DateTime
-  createdAt   DateTime @default(now())
   
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Reports
+  reports         Report[]
   
+  // Assessments
+  assessments     Assessment[]
+  
+  // Shelter assessments
+  shelterAssessments ShelterAssessment[]
+  
+  // WASH assessments
+  washAssessments WashAssessment[]
+  
+  // Health records
+  healthRecords   HealthRecord[]
+  
+  // Protection incidents
+  protectionIncidents ProtectionIncident[]
+  
+  // Nutrition assessments
+  nutritionAssessments NutritionAssessment[]
+  
+  // Education enrollments
+  educationEnrollments EducationEnrollment[]
+  
+  // Distribution records
+  distributionRecords DistributionRecord[]
 }
 
 enum UserRole {
-  SUPER_ADMIN
   ADMIN
-  EDITOR
+  DATA_ENTRY
   VIEWER
+  MANAGER
+  FIELD_OFFICER
 }
 
 // Organization
 model Organization {
   id              String    @id @default(cuid())
   name            String
-  slug            String    @unique
-  description     String?
-  logo            String?
-  primaryColor    String?
-  secondaryColor  String?
+  type            String
+  country         String
+  contactEmail    String
+  contactPhone    String
+  address         String?
+  website         String?
   isActive        Boolean   @default(true)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
-
+  
   // Relations
   users           User[]
+  sites           Site[]
   reports         Report[]
-  templates       Template[]
-  mediaFiles      MediaFile[]
-
 }
 
-// Reports
-model Report {
-  id              String    @id @default(cuid())
-  title           String
-  slug            String
-  description     String?
-  status          ReportStatus @default(DRAFT)
-  version         Int       @default(1)
-  isTemplate      Boolean   @default(false)
-  isPublic        Boolean   @default(false)
-  shareToken      String?   @unique
-  publishedAt     DateTime?
-  metadata        Json?
-  settings        Json?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  // Relations
-  author          User      @relation("ReportAuthor", fields: [authorId], references: [id])
-  authorId        String
-  organization    Organization @relation(fields: [organizationId], references: [id])
-  organizationId  String
-  sections        Section[]
-  collaborators   ReportCollaborator[]
-  access          ReportAccess[]
-  versions        ReportVersion[]
-  exports         ReportExport[]
-  assessments     Assessment[]
-  comments        Comment[]
-  auditLogs       AuditLog[]
-
-  @@unique([slug, organizationId])
-}
-
-enum ReportStatus {
-  DRAFT
-  IN_REVIEW
-  APPROVED
-  PUBLISHED
-  ARCHIVED
-}
-
-model Section {
-  id          String    @id @default(cuid())
-  reportId    String
-  title       String
-  type        SectionType
-  content     Json?     // Rich text content, charts, tables, etc.
-  order       Int
-  isVisible   Boolean   @default(true)
-  metadata    Json?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  // Relations
-  report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  media       MediaFile[]
-
-}
-
-enum SectionType {
-  TEXT
-  CHART
-  TABLE
-  MAP
-  IMAGE_GALLERY
-  ASSESSMENT_DATA
-  STATISTICS
-  RECOMMENDATIONS
-}
-
-// Templates
-model Template {
+// Site/Location
+model Site {
   id              String    @id @default(cuid())
   name            String
+  type            String    // Camp, Settlement, Host Community
+  location        String
+  coordinates     String?
+  population      Int?
+  households      Int?
   description     String?
-  category        String
-  structure       Json      // Template structure and default sections
-  isPublic        Boolean   @default(false)
-  usageCount      Int       @default(0)
+  isActive        Boolean   @default(true)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
-
+  
   // Relations
   organization    Organization @relation(fields: [organizationId], references: [id])
   organizationId  String
-
+  assessments     Assessment[]
+  households_site Household[]
+  individuals     Individual[]
 }
 
-// Assessment Data
+// Household Registration
+model Household {
+  id                String    @id @default(cuid())
+  householdCode     String    @unique
+  registrationDate  DateTime  @default(now())
+  size              Int
+  headOfHousehold   String?
+  contactNumber     String?
+  address           String?
+  vulnerability     String?   // High, Medium, Low
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  site              Site?     @relation(fields: [siteId], references: [id])
+  siteId            String?
+  individuals       Individual[]
+  distributionRecords DistributionRecord[]
+}
+
+// Individual Registration
+model Individual {
+  id                String    @id @default(cuid())
+  individualCode    String    @unique
+  fullLegalName     String
+  dateOfBirth       DateTime
+  age               Int
+  gender            String
+  nationality       String?
+  documentType      String?   // ID, Passport, Birth Certificate
+  documentNumber    String?
+  phoneNumber       String?
+  isHeadOfHousehold Boolean   @default(false)
+  vulnerabilities   String?   // JSON array of vulnerabilities
+  specialNeeds      String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  household         Household? @relation(fields: [householdId], references: [id])
+  householdId       String?
+  site              Site?      @relation(fields: [siteId], references: [id])
+  siteId            String?
+  
+  // Health records
+  healthRecords     HealthRecord[]
+  
+  // Protection incidents
+  victimIncidents   ProtectionIncident[] @relation("VictimIncidents")
+  perpetratorIncidents ProtectionIncident[] @relation("PerpetratorIncidents")
+  
+  // Nutrition assessments
+  nutritionAssessments NutritionAssessment[]
+  
+  // Education enrollments
+  educationEnrollments EducationEnrollment[]
+}
+
+// Assessment
 model Assessment {
   id              String    @id @default(cuid())
-  reportId        String
-  type            AssessmentType
-  location        String
-  coordinates     Json?     // GeoJSON coordinates
-  affectedPeople  Int?
-  households      Int?
-  methodology     String?
-  teamMembers     Json?     // Array of team member details
-  startDate       DateTime
-  endDate         DateTime
-  findings        Json?     // Structured findings data
-  recommendations Json?     // Structured recommendations
-  sectorData      Json?     // Sector-specific data (health, WASH, etc.)
+  type            String    // Rapid, Detailed, Monitoring
+  sector          String    // Health, WASH, Shelter, Protection, etc.
+  status          String    @default("DRAFT") // DRAFT, IN_PROGRESS, COMPLETED, APPROVED
+  assessmentDate  DateTime  @default(now())
+  location        String?
+  gpsCoordinates  String?
+  summary         String?
+  recommendations String?
+  data            String    // JSON data
+  attachments     String?   // JSON array of file paths
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
-
+  
   // Relations
-  report          Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
-
+  site            Site?     @relation(fields: [siteId], references: [id])
+  siteId          String?
+  author          User      @relation(fields: [authorId], references: [id])
+  authorId        String
 }
 
-enum AssessmentType {
-  RAPID
-  DETAILED
-  SECTORAL
-  MULTI_SECTORAL
-  MONITORING
-}
-
-// Media Management
-model MediaFile {
-  id              String    @id @default(cuid())
-  filename        String
-  originalName    String
-  mimeType        String
-  size            Int
-  url             String
-  thumbnailUrl    String?
-  metadata        Json?     // Photographer, location, caption, etc.
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
+// Shelter Assessment
+model ShelterAssessment {
+  id                String    @id @default(cuid())
+  assessmentDate    DateTime  @default(now())
+  location          String
+  shelterType       String    // Tent, Building, Makeshift, etc.
+  condition         String    // Good, Damaged, Critical
+  occupancy         Int
+  maxCapacity       Int
+  needsRepair       Boolean   @default(false)
+  repairDetails     String?
+  materialsNeeded   String?   // JSON array
+  winterized        Boolean   @default(false)
+  electricity       Boolean   @default(false)
+  waterAccess       Boolean   @default(false)
+  sanitationAccess  Boolean   @default(false)
+  photos            String?   // JSON array of photo URLs
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
   // Relations
-  organization    Organization @relation(fields: [organizationId], references: [id])
-  organizationId  String
-  section         Section?     @relation(fields: [sectionId], references: [id])
-  sectionId       String?
-
+  assessor          User      @relation(fields: [assessorId], references: [id])
+  assessorId        String
 }
 
-// Collaboration
-model ReportCollaborator {
-  id          String    @id @default(cuid())
-  reportId    String
-  userId      String
-  permission  CollaboratorPermission
-  createdAt   DateTime  @default(now())
-
+// WASH Assessment
+model WashAssessment {
+  id                   String    @id @default(cuid())
+  assessmentDate       DateTime  @default(now())
+  location             String
+  
+  // Water
+  waterSourceType      String?   // Well, Spring, River, Piped, etc.
+  waterQuality         String?   // Good, Acceptable, Poor
+  waterQuantity        Float?    // Liters per person per day
+  waterAccessTime      Int?      // Minutes to water source
+  waterTreatment       Boolean   @default(false)
+  treatmentMethod      String?
+  
+  // Sanitation
+  latrineType          String?   // Pit, Flush, Chemical, etc.
+  latrineCount         Int?
+  latrineCondition     String?   // Good, Needs maintenance, Critical
+  peoplePerLatrine     Int?
+  handwashingFacility  Boolean   @default(false)
+  soapAvailable        Boolean   @default(false)
+  
+  // Hygiene
+  hygienePromotion     Boolean   @default(false)
+  wasteManagement      String?   // Good, Acceptable, Poor
+  drainageSystem       String?   // Good, Blocked, None
+  
+  recommendations      String?
+  urgentNeeds          String?
+  photos               String?   // JSON array
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  
   // Relations
-  report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  user        User      @relation(fields: [userId], references: [id])
-
-  @@unique([reportId, userId])
+  assessor             User      @relation(fields: [assessorId], references: [id])
+  assessorId           String
 }
 
-enum CollaboratorPermission {
-  VIEW
-  COMMENT
-  EDIT
-  ADMIN
-}
-
-model Comment {
-  id          String    @id @default(cuid())
-  reportId    String
-  userId      String
-  content     String
-  resolved    Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
+// Health Record
+model HealthRecord {
+  id                String    @id @default(cuid())
+  visitDate         DateTime  @default(now())
+  visitType         String    // Consultation, Emergency, Follow-up
+  chiefComplaint    String?
+  symptoms          String?   // JSON array
+  diagnosis         String?
+  treatment         String?
+  prescriptions     String?   // JSON array
+  referralNeeded    Boolean   @default(false)
+  referralTo        String?
+  referralReason    String?
+  followUpDate      DateTime?
+  vitalSigns        String?   // JSON object
+  immunizations     String?   // JSON array
+  allergies         String?
+  chronicConditions String?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
   // Relations
-  report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  user        User      @relation(fields: [userId], references: [id])
-
+  individual        Individual @relation(fields: [individualId], references: [id])
+  individualId      String
+  provider          User       @relation(fields: [providerId], references: [id])
+  providerId        String
 }
 
-// Access Control
-model ReportAccess {
-  id          String    @id @default(cuid())
-  reportId    String
-  userId      String?
-  token       String?   @unique // For public sharing
-  permission  AccessPermission
-  expiresAt   DateTime?
-  createdAt   DateTime  @default(now())
-
+// Protection Incident
+model ProtectionIncident {
+  id                String    @id @default(cuid())
+  incidentDate      DateTime
+  incidentType      String    // SGBV, Child Protection, Trafficking, etc.
+  location          String
+  description       String
+  immediateAction   String?
+  referralMade      Boolean   @default(false)
+  referralTo        String?
+  followUpRequired  Boolean   @default(false)
+  followUpDate      DateTime?
+  status            String    @default("REPORTED") // REPORTED, UNDER_INVESTIGATION, RESOLVED, CLOSED
+  confidential      Boolean   @default(true)
+  consentObtained   Boolean   @default(false)
+  supportProvided   String?   // JSON array
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
   // Relations
-  report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  user        User?     @relation(fields: [userId], references: [id])
-
+  victim            Individual? @relation("VictimIncidents", fields: [victimId], references: [id])
+  victimId          String?
+  perpetrator       Individual? @relation("PerpetratorIncidents", fields: [perpetratorId], references: [id])
+  perpetratorId     String?
+  reporter          User        @relation(fields: [reporterId], references: [id])
+  reporterId        String
 }
 
-enum AccessPermission {
-  READ
-  WRITE
-  ADMIN
-}
-
-// Version Control
-model ReportVersion {
-  id          String    @id @default(cuid())
-  reportId    String
-  version     Int
-  data        Json      // Complete report snapshot
-  changes     Json?     // Diff from previous version
-  createdBy   String
-  createdAt   DateTime  @default(now())
-
+// Nutrition Assessment
+model NutritionAssessment {
+  id                String    @id @default(cuid())
+  assessmentDate    DateTime  @default(now())
+  
+  // Anthropometric measurements
+  weight            Float     // kg
+  height            Float     // cm
+  muacScore         Float?    // Mid-Upper Arm Circumference in mm
+  edema             Boolean   @default(false)
+  
+  // Calculated indicators
+  weightForAge      String?   // Z-score
+  heightForAge      String?   // Z-score
+  weightForHeight   String?   // Z-score
+  bmi               Float?
+  
+  // Status
+  nutritionStatus   String    // Normal, MAM, SAM
+  appetiteTest      String?   // Pass/Fail
+  medicalComplications Boolean @default(false)
+  complicationDetails String?
+  
+  // Treatment
+  enrolled          Boolean   @default(false)
+  programType       String?   // OTP, SFP, etc.
+  admissionDate     DateTime?
+  dischargeDate     DateTime?
+  dischargeStatus   String?   // Cured, Defaulter, Death, etc.
+  
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
   // Relations
-  report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
-
-  @@unique([reportId, version])
+  individual        Individual @relation(fields: [individualId], references: [id])
+  individualId      String
+  assessor          User       @relation(fields: [assessorId], references: [id])
+  assessorId        String
 }
 
-// Export History
-model ReportExport {
-  id          String    @id @default(cuid())
-  reportId    String
-  format      ExportFormat
-  url         String?
-  status      ExportStatus
-  error       String?
-  createdAt   DateTime  @default(now())
-  completedAt DateTime?
-
+// Education Enrollment
+model EducationEnrollment {
+  id                String    @id @default(cuid())
+  enrollmentDate    DateTime  @default(now())
+  academicYear      String
+  schoolName        String?
+  gradeLevel        String
+  enrollmentStatus  String    // Enrolled, Dropped Out, Graduated
+  attendance        Float?    // Percentage
+  performance       String?   // Excellent, Good, Average, Poor
+  supportNeeded     String?   // JSON array
+  barriersToEducation String? // JSON array
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
   // Relations
-  report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
-
+  student           Individual @relation(fields: [studentId], references: [id])
+  studentId         String
+  enrolledBy        User       @relation(fields: [enrolledById], references: [id])
+  enrolledById      String
 }
 
-enum ExportFormat {
-  PDF
-  WORD
-  EXCEL
-  HTML
-  JSON
+// Distribution Record
+model DistributionRecord {
+  id                String    @id @default(cuid())
+  distributionDate  DateTime  @default(now())
+  distributionType  String    // Food, NFI, Cash, Voucher
+  items             String    // JSON array of items and quantities
+  totalValue        Float?
+  collectorName     String
+  collectorIdNumber String?
+  verificationMethod String?  // Signature, Fingerprint, Photo
+  verified          Boolean   @default(false)
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  household         Household  @relation(fields: [householdId], references: [id])
+  householdId       String
+  distributedBy     User       @relation(fields: [distributedById], references: [id])
+  distributedById   String
 }
 
-enum ExportStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
+// Report
+model Report {
+  id                    String    @id @default(cuid())
+  title                 String
+  type                  String    // Situation Report, Assessment, Monthly, etc.
+  status                String    @default("DRAFT") // DRAFT, IN_REVIEW, PUBLISHED
+  reportingPeriodStart  DateTime
+  reportingPeriodEnd    DateTime
+  sectors               String    // JSON array
+  summary               String?
+  content               String    // Rich text or markdown
+  data                  String?   // JSON data
+  recommendations       String?
+  attachments           String?   // JSON array
+  publishedAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  // Relations
+  author                User      @relation(fields: [authorId], references: [id])
+  authorId              String
+  organization          Organization @relation(fields: [organizationId], references: [id])
+  organizationId        String
 }
 
 // Audit Log
 model AuditLog {
   id          String    @id @default(cuid())
-  userId      String?
-  action      String
-  entity      String
+  action      String    // CREATE, UPDATE, DELETE, VIEW, EXPORT
+  entity      String    // User, Assessment, Report, etc.
   entityId    String
-  metadata    Json?
+  details     String?   // JSON with old and new values
   ipAddress   String?
   userAgent   String?
   createdAt   DateTime  @default(now())
-
+  
   // Relations
-  user        User?     @relation(fields: [userId], references: [id])
-  report      Report?   @relation(fields: [entityId], references: [id])
-
-}
-
-// Notifications
-model Notification {
-  id          String    @id @default(cuid())
+  user        User      @relation(fields: [userId], references: [id])
   userId      String
-  type        NotificationType
-  title       String
-  message     String
-  data        Json?
-  read        Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-
-  // Relations
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-}
-
-enum NotificationType {
-  REPORT_SHARED
-  REPORT_COMMENTED
-  REPORT_PUBLISHED
-  EXPORT_COMPLETED
-  SYSTEM
 }

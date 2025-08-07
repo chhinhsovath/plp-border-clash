@@ -1,0 +1,11 @@
+{
+  "buildCommand": "prisma generate && prisma db push && next build",
+  "env": {
+    "DATABASE_URL": "@database_url",
+    "JWT_SECRET": "@jwt_secret",
+    "NEXTAUTH_SECRET": "@nextauth_secret",
+    "VERCEL_BLOB_READ_WRITE_TOKEN": "@vercel_blob_token"
+  },
+  "framework": "nextjs",
+  "outputDirectory": ".next"
+}

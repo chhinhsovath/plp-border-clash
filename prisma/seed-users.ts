@@ -8,14 +8,18 @@ async function main() {
 
   // Create default organization
   const defaultOrg = await prisma.organization.upsert({
-    where: { slug: 'humanitarian-aid-org' },
+    where: { id: 'default-org-id' },
     update: {},
     create: {
+      id: 'default-org-id',
       name: 'Humanitarian Aid Organization',
-      slug: 'humanitarian-aid-org',
-      description: 'Default organization for humanitarian reporting and assessment',
-      primaryColor: '#dc2626',
-      secondaryColor: '#f87171'
+      type: 'NGO',
+      country: 'Global',
+      contactEmail: 'contact@hrs.openplp.com',
+      contactPhone: '+1234567890',
+      address: 'Humanitarian Aid Center, Main Street',
+      website: 'https://hrs.openplp.com',
+      isActive: true
     }
   })
 
@@ -32,11 +36,11 @@ async function main() {
       description: 'Full administrative access'
     },
     {
-      email: 'editor@hrs.openplp.com',
-      password: 'Editor@123',
-      firstName: 'Editor',
+      email: 'dataentry@hrs.openplp.com',
+      password: 'DataEntry@123',
+      firstName: 'Data Entry',
       lastName: 'User',
-      role: 'EDITOR' as const,
+      role: 'DATA_ENTRY' as const,
       description: 'Can create and edit reports'
     },
     {
@@ -48,12 +52,12 @@ async function main() {
       description: 'Read-only access'
     },
     {
-      email: 'super@hrs.openplp.com',
-      password: 'Super@123',
-      firstName: 'Super',
-      lastName: 'Admin',
-      role: 'SUPER_ADMIN' as const,
-      description: 'System administrator'
+      email: 'manager@hrs.openplp.com',
+      password: 'Manager@123',
+      firstName: 'Manager',
+      lastName: 'User',
+      role: 'MANAGER' as const,
+      description: 'Manager with elevated privileges'
     }
   ]
 
@@ -92,38 +96,36 @@ async function main() {
     const sampleReports = [
       {
         title: 'Emergency Response Assessment - Q1 2025',
-        slug: 'emergency-response-q1-2025',
         description: 'Comprehensive assessment of emergency response activities',
+        type: 'Assessment',
         status: 'PUBLISHED' as const
       },
       {
         title: 'Border Region Needs Assessment',
-        slug: 'border-region-needs-assessment',
         description: 'Assessment of humanitarian needs in border regions',
+        type: 'Situation Report',
         status: 'IN_REVIEW' as const
       },
       {
         title: 'Monthly Activity Report - January 2025',
-        slug: 'monthly-report-jan-2025',
         description: 'Summary of activities and interventions',
+        type: 'Monthly',
         status: 'DRAFT' as const
       }
     ]
 
     for (const report of sampleReports) {
-      await prisma.report.upsert({
-        where: { 
-          slug_organizationId: {
-            slug: report.slug,
-            organizationId: defaultOrg.id
-          }
-        },
-        update: {},
-        create: {
+      await prisma.report.create({
+        data: {
           title: report.title,
-          slug: report.slug,
-          description: report.description,
+          type: report.type,
           status: report.status,
+          reportingPeriodStart: new Date('2025-01-01'),
+          reportingPeriodEnd: new Date('2025-03-31'),
+          sectors: JSON.stringify(['Health', 'WASH', 'Shelter']),
+          summary: report.description,
+          content: `# ${report.title}\n\n${report.description}\n\n## Executive Summary\n\nThis report provides a comprehensive overview of humanitarian activities.`,
+          data: JSON.stringify({ assessmentData: {} }),
           authorId: adminUser.id,
           organizationId: defaultOrg.id,
           publishedAt: report.status === 'PUBLISHED' ? new Date() : null

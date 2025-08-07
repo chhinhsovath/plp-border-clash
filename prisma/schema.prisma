@@ -30,6 +30,9 @@ model User {
   organization    Organization @relation(fields: [organizationId], references: [id])
   organizationId  String
   
+  // Sessions
+  sessions        Session[]
+  
   // Audit logs
   auditLogs       AuditLog[]
   
@@ -59,6 +62,18 @@ model User {
   
   // Distribution records
   distributionRecords DistributionRecord[]
+}
+
+// Session model for authentication
+model Session {
+  id          String   @id @default(cuid())
+  userId      String
+  token       String   @unique
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum UserRole {

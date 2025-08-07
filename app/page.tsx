@@ -6,23 +6,23 @@ import { Eye, EyeOff, Heart, Shield, Globe, Users, AlertCircle } from 'lucide-re
 // Test credentials for demo
 const testCredentials = [
   {
-    role: 'Super Admin',
-    email: 'super@hrs.openplp.com',
-    password: 'Super@123',
-    access: 'Full system control',
-    color: '#8b5cf6'
-  },
-  {
     role: 'Admin',
     email: 'admin@hrs.openplp.com',
     password: 'Admin@123',
-    access: 'Organization management',
+    access: 'Full administrative access',
+    color: '#8b5cf6'
+  },
+  {
+    role: 'Manager',
+    email: 'manager@hrs.openplp.com',
+    password: 'Manager@123',
+    access: 'Manager with elevated privileges',
     color: '#3b82f6'
   },
   {
-    role: 'Editor',
-    email: 'editor@hrs.openplp.com',
-    password: 'Editor@123',
+    role: 'Data Entry',
+    email: 'dataentry@hrs.openplp.com',
+    password: 'DataEntry@123',
     access: 'Create & edit reports',
     color: '#10b981'
   },

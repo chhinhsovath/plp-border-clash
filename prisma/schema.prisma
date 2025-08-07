@@ -1,0 +1,400 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User and Authentication
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  password        String
+  firstName       String
+  lastName        String
+  role            UserRole  @default(VIEWER)
+  isActive        Boolean   @default(true)
+  emailVerified   Boolean   @default(false)
+  mfaEnabled      Boolean   @default(false)
+  mfaSecret       String?
+  lastLogin       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  organizationId  String
+  reports         Report[]     @relation("ReportAuthor")
+  reportAccess    ReportAccess[]
+  auditLogs       AuditLog[]
+  sessions        Session[]
+  collaborations  ReportCollaborator[]
+  comments        Comment[]
+  notifications   Notification[]
+
+  @@index([email])
+  @@index([organizationId])
+}
+
+model Session {
+  id          String   @id @default(cuid())
+  userId      String
+  token       String   @unique
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([token])
+  @@index([userId])
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+// Organization
+model Organization {
+  id              String    @id @default(cuid())
+  name            String
+  slug            String    @unique
+  description     String?
+  logo            String?
+  primaryColor    String?
+  secondaryColor  String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  users           User[]
+  reports         Report[]
+  templates       Template[]
+  mediaFiles      MediaFile[]
+
+  @@index([slug])
+}
+
+// Reports
+model Report {
+  id              String    @id @default(cuid())
+  title           String
+  slug            String
+  description     String?
+  status          ReportStatus @default(DRAFT)
+  version         Int       @default(1)
+  isTemplate      Boolean   @default(false)
+  isPublic        Boolean   @default(false)
+  shareToken      String?   @unique
+  publishedAt     DateTime?
+  metadata        Json?
+  settings        Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  author          User      @relation("ReportAuthor", fields: [authorId], references: [id])
+  authorId        String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  organizationId  String
+  sections        Section[]
+  collaborators   ReportCollaborator[]
+  access          ReportAccess[]
+  versions        ReportVersion[]
+  exports         ReportExport[]
+  assessments     Assessment[]
+  comments        Comment[]
+  auditLogs       AuditLog[]
+
+  @@unique([slug, organizationId])
+  @@index([organizationId])
+  @@index([authorId])
+  @@index([status])
+}
+
+enum ReportStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+model Section {
+  id          String    @id @default(cuid())
+  reportId    String
+  title       String
+  type        SectionType
+  content     Json?     // Rich text content, charts, tables, etc.
+  order       Int
+  isVisible   Boolean   @default(true)
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  media       MediaFile[]
+
+  @@index([reportId])
+  @@index([order])
+}
+
+enum SectionType {
+  TEXT
+  CHART
+  TABLE
+  MAP
+  IMAGE_GALLERY
+  ASSESSMENT_DATA
+  STATISTICS
+  RECOMMENDATIONS
+}
+
+// Templates
+model Template {
+  id              String    @id @default(cuid())
+  name            String
+  description     String?
+  category        String
+  structure       Json      // Template structure and default sections
+  isPublic        Boolean   @default(false)
+  usageCount      Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  organizationId  String
+
+  @@index([organizationId])
+  @@index([category])
+}
+
+// Assessment Data
+model Assessment {
+  id              String    @id @default(cuid())
+  reportId        String
+  type            AssessmentType
+  location        String
+  coordinates     Json?     // GeoJSON coordinates
+  affectedPeople  Int?
+  households      Int?
+  methodology     String?
+  teamMembers     Json?     // Array of team member details
+  startDate       DateTime
+  endDate         DateTime
+  findings        Json?     // Structured findings data
+  recommendations Json?     // Structured recommendations
+  sectorData      Json?     // Sector-specific data (health, WASH, etc.)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  report          Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([type])
+}
+
+enum AssessmentType {
+  RAPID
+  DETAILED
+  SECTORAL
+  MULTI_SECTORAL
+  MONITORING
+}
+
+// Media Management
+model MediaFile {
+  id              String    @id @default(cuid())
+  filename        String
+  originalName    String
+  mimeType        String
+  size            Int
+  url             String
+  thumbnailUrl    String?
+  metadata        Json?     // Photographer, location, caption, etc.
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  organizationId  String
+  section         Section?     @relation(fields: [sectionId], references: [id])
+  sectionId       String?
+
+  @@index([organizationId])
+  @@index([sectionId])
+}
+
+// Collaboration
+model ReportCollaborator {
+  id          String    @id @default(cuid())
+  reportId    String
+  userId      String
+  permission  CollaboratorPermission
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@unique([reportId, userId])
+  @@index([reportId])
+  @@index([userId])
+}
+
+enum CollaboratorPermission {
+  VIEW
+  COMMENT
+  EDIT
+  ADMIN
+}
+
+model Comment {
+  id          String    @id @default(cuid())
+  reportId    String
+  userId      String
+  content     String
+  resolved    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@index([reportId])
+  @@index([userId])
+}
+
+// Access Control
+model ReportAccess {
+  id          String    @id @default(cuid())
+  reportId    String
+  userId      String?
+  token       String?   @unique // For public sharing
+  permission  AccessPermission
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user        User?     @relation(fields: [userId], references: [id])
+
+  @@index([reportId])
+  @@index([userId])
+  @@index([token])
+}
+
+enum AccessPermission {
+  READ
+  WRITE
+  ADMIN
+}
+
+// Version Control
+model ReportVersion {
+  id          String    @id @default(cuid())
+  reportId    String
+  version     Int
+  data        Json      // Complete report snapshot
+  changes     Json?     // Diff from previous version
+  createdBy   String
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@unique([reportId, version])
+  @@index([reportId])
+}
+
+// Export History
+model ReportExport {
+  id          String    @id @default(cuid())
+  reportId    String
+  format      ExportFormat
+  url         String?
+  status      ExportStatus
+  error       String?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  // Relations
+  report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([status])
+}
+
+enum ExportFormat {
+  PDF
+  WORD
+  EXCEL
+  HTML
+  JSON
+}
+
+enum ExportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// Audit Log
+model AuditLog {
+  id          String    @id @default(cuid())
+  userId      String?
+  action      String
+  entity      String
+  entityId    String
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  user        User?     @relation(fields: [userId], references: [id])
+  report      Report?   @relation(fields: [entityId], references: [id])
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+// Notifications
+model Notification {
+  id          String    @id @default(cuid())
+  userId      String
+  type        NotificationType
+  title       String
+  message     String
+  data        Json?
+  read        Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  REPORT_SHARED
+  REPORT_COMMENTED
+  REPORT_PUBLISHED
+  EXPORT_COMPLETED
+  SYSTEM
+}

@@ -46,7 +46,7 @@ export default function ProtectionIncidentReport() {
     perpetratorId: '',
     perpetratorSearch: '',
     perpetratorDesc: '',
-    isPerpetrator Known: false,
+    isPerpetratorKnown: false,
     referralStatus: '',
     actionTaken: '',
     followUpNotes: '',
@@ -133,7 +133,7 @@ export default function ProtectionIncidentReport() {
         ...formData,
         perpetratorId: individual.id,
         perpetratorSearch: `${individual.fullLegalName} (${individual.individualCode})`,
-        isPerpetrator Known: true
+        isPerpetratorKnown: true
       })
     }
     setFilteredIndividuals([])
@@ -161,8 +161,8 @@ export default function ProtectionIncidentReport() {
           location: formData.location,
           description: formData.description,
           victimId: formData.victimId,
-          perpetratorId: formData.isPerpetrator Known ? formData.perpetratorId : null,
-          perpetratorDesc: !formData.isPerpetrator Known ? formData.perpetratorDesc : null,
+          perpetratorId: formData.isPerpetratorKnown ? formData.perpetratorId : null,
+          perpetratorDesc: !formData.isPerpetratorKnown ? formData.perpetratorDesc : null,
           referralStatus: formData.referralStatus,
           actionTaken: formData.actionTaken,
           followUpNotes: formData.followUpNotes
@@ -692,8 +692,8 @@ export default function ProtectionIncidentReport() {
                     <input
                       type="radio"
                       name="perpKnown"
-                      checked={formData.isPerpetrator Known}
-                      onChange={() => setFormData({ ...formData, isPerpetrator Known: true })}
+                      checked={formData.isPerpetratorKnown}
+                      onChange={() => setFormData({ ...formData, isPerpetratorKnown: true })}
                     />
                     <span style={{ fontSize: '14px' }}>Known Individual (in database)</span>
                   </label>
@@ -706,14 +706,14 @@ export default function ProtectionIncidentReport() {
                     <input
                       type="radio"
                       name="perpKnown"
-                      checked={!formData.isPerpetrator Known}
-                      onChange={() => setFormData({ ...formData, isPerpetrator Known: false, perpetratorId: '' })}
+                      checked={!formData.isPerpetratorKnown}
+                      onChange={() => setFormData({ ...formData, isPerpetratorKnown: false, perpetratorId: '' })}
                     />
                     <span style={{ fontSize: '14px' }}>Unknown / Description Only</span>
                   </label>
                 </div>
 
-                {formData.isPerpetrator Known ? (
+                {formData.isPerpetratorKnown ? (
                   <div>
                     <input
                       type="text"

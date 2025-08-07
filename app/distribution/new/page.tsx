@@ -364,15 +364,15 @@ export default function DistributionForm() {
       )}
 
       {/* Main Content */}
-      <div className=\"max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6\">
-        <div className=\"grid grid-cols-1 lg:grid-cols-3 gap-6\">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Beneficiary & Details */}
-          <div className=\"space-y-6\">
+          <div className="space-y-6">
             {/* Household Selection */}
             <Card>
               <CardHeader>
-                <CardTitle className=\"flex items-center gap-2\">
-                  <Users className=\"h-5 w-5 text-blue-600\" />
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-blue-600" />
                   Beneficiary Household
                 </CardTitle>
                 <CardDescription>
@@ -382,31 +382,31 @@ export default function DistributionForm() {
               <CardContent>
               
               {!selectedHousehold ? (
-                <div className=\"space-y-3\">
-                  <Label className=\"flex items-center gap-2\">
-                    <Search className=\"h-4 w-4\" />
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2">
+                    <Search className="h-4 w-4" />
                     Search Household *
                   </Label>
-                  <div className=\"relative\">
+                  <div className="relative">
                     <Input
                       value={searchTerm}
                       onChange={(e) => {
                         setSearchTerm(e.target.value)
                         searchHouseholds()
                       }}
-                      placeholder=\"Search by household code...\"
+                      placeholder="Search by household code..."
                     />
                     
                     {searchResults.length > 0 && (
-                      <div className=\"absolute top-full left-0 right-0 z-10 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto\">
+                      <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
                         {searchResults.map(household => (
                           <div
                             key={household.id}
                             onClick={() => selectHousehold(household)}
-                            className=\"p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 last:border-b-0\"
+                            className="p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 last:border-b-0"
                           >
-                            <div className=\"font-medium text-sm\">{household.householdCode}</div>
-                            <div className=\"text-xs text-gray-500 mt-1\">
+                            <div className="font-medium text-sm">{household.householdCode}</div>
+                            <div className="text-xs text-gray-500 mt-1">
                               Household Size: {household.size} members
                             </div>
                           </div>
@@ -416,28 +416,28 @@ export default function DistributionForm() {
                   </div>
                 </div>
               ) : (
-                <div className=\"space-y-3\">
-                  <div className=\"p-4 bg-blue-50 border border-blue-200 rounded-lg\">
-                    <div className=\"text-lg font-semibold text-blue-900\">
+                <div className="space-y-3">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="text-lg font-semibold text-blue-900">
                       {selectedHousehold.householdCode}
                     </div>
-                    <div className=\"text-sm text-blue-700 mt-1\">
+                    <div className="text-sm text-blue-700 mt-1">
                       Size: {selectedHousehold.size} members
                     </div>
-                    <Badge variant=\"secondary\" className=\"mt-2\">
+                    <Badge variant="secondary" className="mt-2">
                       Standard ration calculated for {selectedHousehold.size} people
                     </Badge>
                   </div>
                   
                   <Button
-                    variant=\"outline\"
-                    size=\"sm\"
+                    variant="outline"
+                    size="sm"
                     onClick={() => {
                       setSelectedHousehold(null)
                       setFormData({ ...formData, householdId: '' })
                       initializeItems()
                     }}
-                    className=\"text-red-600 border-red-300 hover:bg-red-50\"
+                    className="text-red-600 border-red-300 hover:bg-red-50"
                   >
                     Change Household
                   </Button>

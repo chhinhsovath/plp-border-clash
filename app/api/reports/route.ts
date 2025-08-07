@@ -1,25 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
 import { z } from 'zod'
+import jwt from 'jsonwebtoken'
 
 const createReportSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   templateId: z.string().optional(),
+  status: z.enum(['DRAFT', 'IN_REVIEW', 'APPROVED', 'PUBLISHED', 'ARCHIVED']).optional(),
+  reportType: z.string().optional(),
+  location: z.string().optional(),
+  coordinates: z.object({
+    lat: z.string().optional(),
+    lng: z.string().optional()
+  }).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  affectedPeople: z.string().optional(),
+  households: z.string().optional(),
+  methodology: z.string().optional(),
+  teamMembers: z.array(z.string()).optional(),
+  sectors: z.array(z.string()).optional(),
+  findings: z.string().optional(),
+  recommendations: z.string().optional(),
+  sections: z.array(z.object({
+    id: z.string(),
+    type: z.string(),
+    title: z.string(),
+    content: z.string().optional(),
+    order: z.number()
+  })).optional()
 })
 
 // GET /api/reports - Get all reports for the user's organization
 export async function GET(request: NextRequest) {
   try {
-    const userId = request.headers.get('x-user-id')
-    const organizationId = request.headers.get('x-organization-id')
-    
-    if (!userId || !organizationId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+    // Get token from Authorization header
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
     }
+
+    const token = authHeader.substring(7)
+    
+    let decoded: any
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+    } catch (jwtError: any) {
+      console.error('JWT verification failed:', jwtError.message)
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
+    }
+    
+    // Get user
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId }
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+    
+    const { organizationId } = user
     
     const reports = await prisma.report.findMany({
       where: {
@@ -69,15 +110,37 @@ export async function GET(request: NextRequest) {
 // POST /api/reports - Create a new report
 export async function POST(request: NextRequest) {
   try {
-    const userId = request.headers.get('x-user-id')
-    const organizationId = request.headers.get('x-organization-id')
+    // Get token from Authorization header
+    const authHeader = request.headers.get('authorization')
+    console.log('Auth header:', authHeader)
     
-    if (!userId || !organizationId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('Missing or invalid auth header')
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
     }
+
+    const token = authHeader.substring(7)
+    console.log('Token extracted:', token.substring(0, 20) + '...')
+    
+    let decoded: any
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+      console.log('Token decoded successfully:', decoded)
+    } catch (jwtError: any) {
+      console.error('JWT verification failed:', jwtError.message)
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
+    }
+    
+    // Get user
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId }
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+    
+    const { id: userId, organizationId } = user
     
     const body = await request.json()
     const validation = createReportSchema.safeParse(body)
@@ -89,7 +152,25 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    const { title, description, templateId } = validation.data
+    const { 
+      title, 
+      description, 
+      templateId,
+      status,
+      reportType,
+      location,
+      coordinates,
+      startDate,
+      endDate,
+      affectedPeople,
+      households,
+      methodology,
+      teamMembers,
+      sectors,
+      findings,
+      recommendations,
+      sections
+    } = validation.data
     
     // Generate slug from title
     const baseSlug = title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
@@ -106,15 +187,31 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // Build metadata object
+    const metadata = {
+      ...(templateStructure || {}),
+      reportType,
+      location,
+      coordinates,
+      startDate,
+      endDate,
+      sectors,
+      teamMembers,
+      affectedPeople,
+      households,
+      methodology
+    }
+    
     // Create the report
     const report = await prisma.report.create({
       data: {
         title,
         slug,
         description,
+        status: status || 'DRAFT',
         authorId: userId,
         organizationId,
-        metadata: templateStructure || {},
+        metadata,
       },
       include: {
         author: {
@@ -128,13 +225,25 @@ export async function POST(request: NextRequest) {
       }
     })
     
-    // If template structure exists, create default sections
-    if (templateStructure && typeof templateStructure === 'object') {
-      const sections = (templateStructure as any).sections || []
+    // Create sections if provided
+    if (sections && sections.length > 0) {
+      await prisma.section.createMany({
+        data: sections.map((section: any) => ({
+          reportId: report.id,
+          title: section.title,
+          type: section.type,
+          content: section.content ? { text: section.content } : {},
+          order: section.order,
+          metadata: {},
+        }))
+      })
+    } else if (templateStructure && typeof templateStructure === 'object') {
+      // If no sections provided but template exists, use template sections
+      const templateSections = (templateStructure as any).sections || []
       
-      if (sections.length > 0) {
+      if (templateSections.length > 0) {
         await prisma.section.createMany({
-          data: sections.map((section: any, index: number) => ({
+          data: templateSections.map((section: any, index: number) => ({
             reportId: report.id,
             title: section.title || `Section ${index + 1}`,
             type: section.type || 'TEXT',
@@ -144,6 +253,27 @@ export async function POST(request: NextRequest) {
           }))
         })
       }
+    }
+    
+    // Create assessment if assessment data is provided
+    if (reportType && location) {
+      await prisma.assessment.create({
+        data: {
+          reportId: report.id,
+          type: reportType as any,
+          location,
+          coordinates: coordinates && (coordinates.lat || coordinates.lng) ? coordinates : null,
+          affectedPeople: affectedPeople ? parseInt(affectedPeople) : null,
+          households: households ? parseInt(households) : null,
+          methodology,
+          teamMembers: teamMembers && teamMembers.length > 0 ? { members: teamMembers } : null,
+          startDate: startDate ? new Date(startDate) : new Date(),
+          endDate: endDate ? new Date(endDate) : new Date(),
+          findings: findings ? { text: findings } : null,
+          recommendations: recommendations ? { text: recommendations } : null,
+          sectorData: sectors && sectors.length > 0 ? { sectors } : null
+        }
+      })
     }
     
     // Create audit log

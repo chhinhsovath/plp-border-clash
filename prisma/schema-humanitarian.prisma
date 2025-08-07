@@ -1,0 +1,743 @@
+// Humanitarian Data Collection Schema Extension
+// This schema includes all components from the PRD for IDP/refugee data management
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== CORE REGISTRATION ====================
+
+model Individual {
+  id                String    @id @default(cuid())
+  individualCode    String    @unique // Format: KH-IDP-0000001
+  householdId       String
+  isHeadOfHousehold Boolean   @default(false)
+  
+  // Personal Information
+  fullLegalName     String
+  commonlyUsedName  String?
+  dateOfBirth       DateTime
+  age               Int       // Auto-calculated
+  gender            Gender
+  
+  // Demographic & Contact
+  nationality       String
+  ethnicGroup       String?
+  motherTongue      String?
+  preDisplacementAddress String?
+  villageOfOrigin   String?
+  contactNumber     String?
+  
+  // Location
+  currentSiteId     String
+  zoneBlock         String?
+  shelterNumber     String?
+  
+  // Vulnerability Flags
+  unaccompaniedMinor Boolean @default(false)
+  separatedChild    Boolean  @default(false)
+  singleHeadedHH    Boolean  @default(false)
+  pregnant          Boolean  @default(false)
+  pregnancyDueDate  DateTime?
+  lactatingMother   Boolean  @default(false)
+  hasDisability     Boolean  @default(false)
+  disabilityDetails String?
+  elderly           Boolean  @default(false)
+  chronicallyIll    Boolean  @default(false)
+  illnessDetails    String?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  household         Household @relation(fields: [householdId], references: [id])
+  site              IDPSite   @relation(fields: [currentSiteId], references: [id])
+  
+  // Protection
+  protectionIncidentsAsVictim     ProtectionIncident[] @relation("Victim")
+  protectionIncidentsAsPerpetrator ProtectionIncident[] @relation("Perpetrator")
+  psychosocialSessions            PsychosocialSupport[]
+  
+  // Health
+  medicalRecords    MedicalRecord[]
+  clinicalVisits    ClinicalVisit[]
+  nutritionStatus   NutritionAssessment[]
+  
+  // Education
+  educationStatus   EducationStatus[]
+  learningProgress  LearningProgress[]
+  
+  // Livelihood
+  livelihoodProfile LivelihoodProfile?
+}
+
+model Household {
+  id            String   @id @default(cuid())
+  householdCode String   @unique
+  size          Int
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  members       Individual[]
+  shelterAssessments ShelterAssessment[]
+  nfiDistributions   NFIDistribution[]
+  foodDistributions  FoodDistribution[]
+  washProfile        WASHProfile?
+  hygieneDistributions HygieneDistribution[]
+}
+
+model IDPSite {
+  id          String   @id @default(cuid())
+  siteCode    String   @unique // Format: Site-001
+  name        String
+  location    String
+  coordinates String?  // JSON: {lat, lng}
+  capacity    Int
+  population  Int      @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  individuals Individual[]
+  securityIncidents SecurityIncident[]
+}
+
+// ==================== PROTECTION ====================
+
+model ProtectionIncident {
+  id              String   @id @default(cuid())
+  incidentCode    String   @unique
+  dateTime        DateTime
+  incidentType    IncidentType
+  location        String
+  description     String
+  
+  victimId        String
+  perpetratorId   String?
+  perpetratorDesc String?
+  
+  referralStatus  ReferralStatus?
+  actionTaken     String?
+  followUpNotes   String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  victim          Individual @relation("Victim", fields: [victimId], references: [id])
+  perpetrator     Individual? @relation("Perpetrator", fields: [perpetratorId], references: [id])
+}
+
+model PsychosocialSupport {
+  id            String   @id @default(cuid())
+  individualId  String
+  sessionDate   DateTime
+  supportType   SupportType
+  provider      String
+  notes         String?
+  
+  createdAt     DateTime @default(now())
+  
+  // Relations
+  individual    Individual @relation(fields: [individualId], references: [id])
+}
+
+// ==================== SHELTER & NFI ====================
+
+model ShelterAssessment {
+  id            String   @id @default(cuid())
+  householdId   String
+  assessmentDate DateTime
+  shelterType   ShelterType
+  condition     ShelterCondition
+  needsRepair   Boolean  @default(false)
+  repairDetails String?
+  
+  createdAt     DateTime @default(now())
+  
+  // Relations
+  household     Household @relation(fields: [householdId], references: [id])
+}
+
+model NFIDistribution {
+  id              String   @id @default(cuid())
+  distributionDate DateTime
+  householdId     String
+  itemType        NFIType
+  quantity        Int
+  distributedBy   String
+  
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  household       Household @relation(fields: [householdId], references: [id])
+}
+
+// ==================== FOOD SECURITY & LIVELIHOODS ====================
+
+model FoodDistribution {
+  id              String   @id @default(cuid())
+  distributionDate DateTime
+  householdId     String
+  rationType      RationType
+  items           String   // JSON: [{item: "rice", quantity: "5kg"}]
+  distributedBy   String
+  
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  household       Household @relation(fields: [householdId], references: [id])
+}
+
+model NutritionAssessment {
+  id            String   @id @default(cuid())
+  individualId  String
+  assessmentDate DateTime
+  ageAtAssessment Int
+  weight        Float    // kg
+  height        Float    // cm
+  muacScore     Float?   // Mid-Upper Arm Circumference
+  nutritionStatus NutritionStatus
+  
+  createdAt     DateTime @default(now())
+  
+  // Relations
+  individual    Individual @relation(fields: [individualId], references: [id])
+}
+
+model LivelihoodProfile {
+  id              String   @id @default(cuid())
+  individualId    String   @unique
+  previousOccupation String?
+  skillsets       String   // JSON array of skills
+  interestedInTraining Boolean @default(false)
+  assistanceReceived String? // JSON array of assistance types
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  individual      Individual @relation(fields: [individualId], references: [id])
+}
+
+// ==================== HEALTH ====================
+
+model MedicalRecord {
+  id              String   @id @default(cuid())
+  individualId    String
+  chronicConditions String? // JSON array
+  knownAllergies  String?  // JSON array
+  bloodType       String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  individual      Individual @relation(fields: [individualId], references: [id])
+  immunizations   Immunization[]
+}
+
+model Immunization {
+  id            String   @id @default(cuid())
+  medicalRecordId String
+  vaccineName   String
+  dateAdministered DateTime
+  nextDoseDate  DateTime?
+  
+  // Relations
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+}
+
+model ClinicalVisit {
+  id            String   @id @default(cuid())
+  individualId  String
+  visitDate     DateTime
+  symptoms      String
+  diagnosis     String   // ICD-10 code
+  diagnosisDesc String?
+  treatmentPlan String
+  medications   String?  // JSON array
+  clinicianName String
+  followUpDate  DateTime?
+  
+  createdAt     DateTime @default(now())
+  
+  // Relations
+  individual    Individual @relation(fields: [individualId], references: [id])
+}
+
+// ==================== WASH ====================
+
+model WASHProfile {
+  id              String   @id @default(cuid())
+  householdId     String   @unique
+  waterPointDistance Int   // meters
+  hasPrivateLatrine Boolean @default(false)
+  latrineSharedWith Int?  // number of people
+  handwashingFacility Boolean @default(false)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  household       Household @relation(fields: [householdId], references: [id])
+}
+
+model HygieneDistribution {
+  id              String   @id @default(cuid())
+  distributionDate DateTime
+  householdId     String
+  itemType        HygieneItem
+  quantity        Int
+  distributedBy   String
+  
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  household       Household @relation(fields: [householdId], references: [id])
+}
+
+// ==================== EDUCATION ====================
+
+model EducationStatus {
+  id              String   @id @default(cuid())
+  individualId    String
+  academicYear    String
+  enrollmentStatus EnrollmentStatus
+  learningSpaceId String?
+  lastGradeCompleted String?
+  nonEnrollmentReason NonEnrollmentReason?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  individual      Individual @relation(fields: [individualId], references: [id])
+}
+
+model LearningProgress {
+  id              String   @id @default(cuid())
+  individualId    String
+  lmsUserId       String?  @unique
+  modulesCompleted String? // JSON array
+  assessmentScores String? // JSON object
+  attendanceRate  Float?
+  lastActiveDate  DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  individual      Individual @relation(fields: [individualId], references: [id])
+}
+
+// ==================== SAFETY & SECURITY ====================
+
+model SecurityIncident {
+  id            String   @id @default(cuid())
+  incidentCode  String   @unique
+  siteId        String
+  dateTime      DateTime
+  incidentType  SecurityIncidentType
+  impact        ImpactLevel
+  description   String
+  response      String?
+  
+  createdAt     DateTime @default(now())
+  
+  // Relations
+  site          IDPSite @relation(fields: [siteId], references: [id])
+}
+
+model FeedbackLog {
+  id            String   @id @default(cuid())
+  feedbackCode  String   @unique
+  submissionDate DateTime
+  feedbackType  FeedbackType
+  category      String?
+  concern       String
+  status        FeedbackStatus
+  resolution    String?
+  resolvedDate  DateTime?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ==================== EXISTING MODELS (Keep for compatibility) ====================
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  password        String
+  firstName       String
+  lastName        String
+  role            UserRole  @default(VIEWER)
+  isActive        Boolean   @default(true)
+  emailVerified   Boolean   @default(false)
+  mfaEnabled      Boolean   @default(false)
+  mfaSecret       String?
+  lastLogin       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  organizationId  String
+  reports         Report[]     @relation("ReportAuthor")
+  reportAccess    ReportAccess[]
+  auditLogs       AuditLog[]
+  sessions        Session[]
+  collaborations  ReportCollaborator[]
+  comments        Comment[]
+  notifications   Notification[]
+}
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  website     String?
+  logo        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  users       User[]
+  reports     Report[]
+  templates   Template[]
+}
+
+model Report {
+  id              String   @id @default(cuid())
+  title           String
+  slug            String   @unique
+  description     String?
+  status          ReportStatus @default(DRAFT)
+  version         Int      @default(1)
+  publishedAt     DateTime?
+  metadata        String?  // JSON field for flexible data
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  author          User     @relation("ReportAuthor", fields: [authorId], references: [id])
+  authorId        String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  organizationId  String
+  sections        Section[]
+  collaborators   ReportCollaborator[]
+  accessControls  ReportAccess[]
+  comments        Comment[]
+  auditLogs       AuditLog[]
+  assessments     Assessment[]
+}
+
+// [Keep other existing models...]
+
+// ==================== ENUMS ====================
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum IncidentType {
+  SGBV
+  PHYSICAL_ASSAULT
+  TRAFFICKING
+  CHILD_ABUSE
+  HARASSMENT
+  THEFT
+  OTHER
+}
+
+enum ReferralStatus {
+  REFERRED_HEALTH
+  REFERRED_POLICE
+  REFERRED_LEGAL
+  REFERRED_PSYCHOSOCIAL
+  NO_REFERRAL
+}
+
+enum SupportType {
+  INDIVIDUAL_COUNSELING
+  GROUP_THERAPY
+  PLAY_THERAPY
+  FAMILY_COUNSELING
+  PEER_SUPPORT
+}
+
+enum ShelterType {
+  TENT
+  T_SHELTER
+  COMMUNAL_BUILDING
+  HOST_FAMILY
+  RENTED
+  MAKESHIFT
+}
+
+enum ShelterCondition {
+  GOOD
+  NEEDS_MINOR_REPAIR
+  NEEDS_MAJOR_REPAIR
+  UNINHABITABLE
+}
+
+enum NFIType {
+  BLANKET
+  SLEEPING_MAT
+  KITCHEN_SET
+  MOSQUITO_NET
+  HYGIENE_KIT
+  TARPAULIN
+  JERRY_CAN
+  BUCKET
+  SOLAR_LAMP
+}
+
+enum RationType {
+  GENERAL_FOOD_RATION
+  HIGH_ENERGY_BISCUITS
+  WFP_RATION
+  SUPPLEMENTARY_FEEDING
+  THERAPEUTIC_FEEDING
+}
+
+enum NutritionStatus {
+  NORMAL
+  MAM  // Moderate Acute Malnutrition
+  SAM  // Severe Acute Malnutrition
+  AT_RISK
+}
+
+enum HygieneItem {
+  SOAP
+  SANITARY_PADS
+  TOOTHPASTE
+  TOOTHBRUSH
+  SHAMPOO
+  DETERGENT
+  DISINFECTANT
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  NOT_ENROLLED
+  DROPPED_OUT
+  GRADUATED
+}
+
+enum NonEnrollmentReason {
+  CHILD_LABOR
+  CARETAKER_DUTIES
+  FEAR_SAFETY
+  NO_SPACE
+  DISABILITY
+  PARENT_RELUCTANCE
+  DISTANCE
+  NO_DOCUMENTATION
+}
+
+enum SecurityIncidentType {
+  FIRE
+  FLOOD
+  CONFLICT
+  PERIMETER_BREACH
+  THEFT
+  VIOLENCE
+  DISEASE_OUTBREAK
+}
+
+enum ImpactLevel {
+  NO_IMPACT
+  MINOR
+  MODERATE
+  MAJOR
+  CRITICAL
+}
+
+enum FeedbackType {
+  COMPLAINT
+  SUGGESTION
+  OBSERVATION
+  APPRECIATION
+  QUESTION
+}
+
+enum FeedbackStatus {
+  RECEIVED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  ESCALATED
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  EDITOR
+  VIEWER
+}
+
+enum ReportStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum AssessmentType {
+  RAPID
+  DETAILED
+  SECTORAL
+  MULTI_SECTORAL
+  MONITORING
+}
+
+// [Keep other existing enums...]
+
+model Session {
+  id          String   @id @default(cuid())
+  userId      String
+  token       String   @unique
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Section {
+  id          String   @id @default(cuid())
+  reportId    String
+  title       String
+  type        String   // TEXT, CHART, TABLE, MAP, etc.
+  content     String?  // JSON field for flexible content
+  order       Int
+  metadata    String?  // JSON field for additional data
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  report      Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+}
+
+model Template {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  category        String?
+  structure       String?  // JSON field for template structure
+  isDefault       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  organizationId  String
+}
+
+model Assessment {
+  id              String   @id @default(cuid())
+  reportId        String
+  type            AssessmentType
+  location        String
+  coordinates     String?  // JSON: {lat, lng}
+  startDate       DateTime
+  endDate         DateTime
+  affectedPeople  Int?
+  households      Int?
+  methodology     String?
+  teamMembers     String?  // JSON array
+  findings        String?  // JSON or text
+  recommendations String?  // JSON or text
+  sectorData      String?  // JSON for sector-specific data
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  report          Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+}
+
+model ReportCollaborator {
+  id          String   @id @default(cuid())
+  reportId    String
+  userId      String
+  role        String   // EDITOR, REVIEWER, etc.
+  addedAt     DateTime @default(now())
+
+  // Relations
+  report      Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@unique([reportId, userId])
+}
+
+model ReportAccess {
+  id          String   @id @default(cuid())
+  reportId    String
+  userId      String
+  permission  String   // READ, WRITE, DELETE
+  grantedAt   DateTime @default(now())
+
+  // Relations
+  report      Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@unique([reportId, userId])
+}
+
+model Comment {
+  id          String   @id @default(cuid())
+  reportId    String
+  userId      String
+  content     String
+  parentId    String?  // For threaded comments
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  report      Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String
+  action      String   // CREATE, UPDATE, DELETE, VIEW, etc.
+  entity      String   // Report, User, etc.
+  entityId    String
+  metadata    String?  // JSON field for additional context
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id])
+  report      Report?  @relation(fields: [entityId], references: [id])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String   // REPORT_SHARED, COMMENT_ADDED, etc.
+  title       String
+  message     String
+  data        String?  // JSON field for additional data
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id])
+}

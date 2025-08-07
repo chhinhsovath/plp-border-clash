@@ -1,28 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Badge } from '@/components/ui/badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { 
-  Shield, 
-  AlertCircle, 
-  Eye, 
-  EyeOff, 
-  User, 
-  Mail, 
-  Lock,
-  Building2,
-  Heart,
-  Globe,
-  Users,
-  FileText,
-  ChevronRight
-} from 'lucide-react'
+import { Eye, EyeOff, Heart, Shield, Globe, Users, AlertCircle } from 'lucide-react'
 
 // Test credentials for demo
 const testCredentials = [
@@ -31,28 +10,28 @@ const testCredentials = [
     email: 'super@hrs.openplp.com',
     password: 'Super@123',
     access: 'Full system control',
-    color: 'bg-purple-500'
+    color: '#8b5cf6'
   },
   {
     role: 'Admin',
     email: 'admin@hrs.openplp.com',
     password: 'Admin@123',
     access: 'Organization management',
-    color: 'bg-blue-500'
+    color: '#3b82f6'
   },
   {
     role: 'Editor',
     email: 'editor@hrs.openplp.com',
     password: 'Editor@123',
     access: 'Create & edit reports',
-    color: 'bg-green-500'
+    color: '#10b981'
   },
   {
     role: 'Viewer',
     email: 'viewer@hrs.openplp.com',
     password: 'Viewer@123',
     access: 'Read-only access',
-    color: 'bg-gray-500'
+    color: '#6b7280'
   }
 ]
 
@@ -95,12 +74,10 @@ export default function Home() {
 
       setMessage({ type: 'success', text: isLogin ? 'Login successful!' : 'Registration successful!' })
       
-      // Store token
       if (data.data?.token) {
         localStorage.setItem('token', data.data.token)
         localStorage.setItem('user', JSON.stringify(data.data.user))
         
-        // Redirect to dashboard after successful auth
         setTimeout(() => {
           window.location.href = '/dashboard'
         }, 1000)
@@ -130,252 +107,426 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50 relative overflow-hidden">
-      {/* Background decorations */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-red-100 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-orange-100 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-yellow-100 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
-      </div>
-
-      <div className="relative z-10 min-h-screen flex flex-col lg:flex-row">
-        {/* Left side - Branding and Info */}
-        <div className="lg:w-1/2 p-8 lg:p-12 flex flex-col justify-center">
-          <div className="max-w-xl mx-auto w-full">
-            {/* Logo and Title */}
-            <div className="mb-8">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 bg-gradient-to-br from-red-500 to-orange-500 rounded-xl text-white">
-                  <Heart className="w-8 h-8" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">HRS Platform</h1>
-                  <p className="text-sm text-gray-600">Humanitarian Report System</p>
-                </div>
-              </div>
-              
-              <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-                Empowering Humanitarian Action
-              </h2>
-              <p className="text-lg text-gray-600 mb-8">
-                Streamline your humanitarian assessments, reports, and data management in one secure platform.
-              </p>
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+    }}>
+      <div style={{
+        width: '100%',
+        maxWidth: '1200px',
+        background: 'white',
+        borderRadius: '20px',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        display: 'flex',
+        overflow: 'hidden'
+      }}>
+        {/* Left Panel */}
+        <div style={{
+          flex: 1,
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          padding: '50px',
+          color: 'white',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center'
+        }}>
+          <div style={{ marginBottom: '40px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
+              <Heart size={40} />
+              <h1 style={{ 
+                fontSize: '32px', 
+                fontWeight: 'bold',
+                marginLeft: '15px'
+              }}>HRS Platform</h1>
             </div>
+            <h2 style={{ 
+              fontSize: '42px', 
+              fontWeight: 'bold',
+              marginBottom: '20px',
+              lineHeight: '1.2'
+            }}>Humanitarian Report System</h2>
+            <p style={{ 
+              fontSize: '18px',
+              opacity: 0.9,
+              lineHeight: '1.6'
+            }}>
+              Streamline your humanitarian assessments, reports, and data management in one secure platform.
+            </p>
+          </div>
 
-            {/* Features */}
-            <div className="grid grid-cols-2 gap-4 mb-8">
-              <div className="flex items-start gap-3">
-                <FileText className="w-5 h-5 text-red-500 mt-1" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Smart Reports</h3>
-                  <p className="text-sm text-gray-600">AI-powered analysis</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Globe className="w-5 h-5 text-red-500 mt-1" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Global Reach</h3>
-                  <p className="text-sm text-gray-600">Multi-region support</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Shield className="w-5 h-5 text-red-500 mt-1" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Secure</h3>
-                  <p className="text-sm text-gray-600">Enterprise security</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Users className="w-5 h-5 text-red-500 mt-1" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Collaborative</h3>
-                  <p className="text-sm text-gray-600">Real-time teamwork</p>
-                </div>
+          {/* Features */}
+          <div style={{ 
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '20px',
+            marginBottom: '40px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'start' }}>
+              <Shield size={20} style={{ marginTop: '2px', marginRight: '10px' }} />
+              <div>
+                <h3 style={{ fontWeight: 'bold', marginBottom: '5px' }}>Secure</h3>
+                <p style={{ fontSize: '14px', opacity: 0.9 }}>Enterprise-grade security</p>
               </div>
             </div>
+            <div style={{ display: 'flex', alignItems: 'start' }}>
+              <Globe size={20} style={{ marginTop: '2px', marginRight: '10px' }} />
+              <div>
+                <h3 style={{ fontWeight: 'bold', marginBottom: '5px' }}>Global</h3>
+                <p style={{ fontSize: '14px', opacity: 0.9 }}>Multi-region support</p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'start' }}>
+              <Users size={20} style={{ marginTop: '2px', marginRight: '10px' }} />
+              <div>
+                <h3 style={{ fontWeight: 'bold', marginBottom: '5px' }}>Collaborative</h3>
+                <p style={{ fontSize: '14px', opacity: 0.9 }}>Real-time teamwork</p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'start' }}>
+              <AlertCircle size={20} style={{ marginTop: '2px', marginRight: '10px' }} />
+              <div>
+                <h3 style={{ fontWeight: 'bold', marginBottom: '5px' }}>Smart</h3>
+                <p style={{ fontSize: '14px', opacity: 0.9 }}>AI-powered insights</p>
+              </div>
+            </div>
+          </div>
 
-            {/* Test Credentials Card */}
-            <Card className="border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-red-50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 text-orange-600" />
-                  Demo Credentials
-                </CardTitle>
-                <CardDescription>Click any role to auto-fill login</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {testCredentials.map((cred) => (
-                  <button
-                    key={cred.email}
-                    onClick={() => handleCredentialClick(cred)}
-                    className={`w-full text-left p-3 rounded-lg border transition-all hover:shadow-md ${
-                      selectedCredential?.email === cred.email 
-                        ? 'border-red-400 bg-white shadow-md' 
-                        : 'border-gray-200 bg-white/80 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full ${cred.color}`}></div>
-                        <div>
-                          <div className="font-semibold text-sm">{cred.role}</div>
-                          <div className="text-xs text-gray-600">{cred.email}</div>
-                        </div>
+          {/* Demo Credentials */}
+          <div style={{
+            background: 'rgba(255,255,255,0.2)',
+            borderRadius: '15px',
+            padding: '25px',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <h3 style={{ 
+              fontSize: '20px',
+              fontWeight: 'bold',
+              marginBottom: '15px',
+              display: 'flex',
+              alignItems: 'center'
+            }}>
+              <AlertCircle size={24} style={{ marginRight: '10px' }} />
+              Demo Credentials
+            </h3>
+            <p style={{ marginBottom: '15px', opacity: 0.9 }}>
+              Click any role below to auto-fill the login form:
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {testCredentials.map((cred) => (
+                <button
+                  key={cred.email}
+                  onClick={() => handleCredentialClick(cred)}
+                  style={{
+                    padding: '12px 15px',
+                    background: selectedCredential?.email === cred.email 
+                      ? 'rgba(255,255,255,0.3)' 
+                      : 'rgba(255,255,255,0.1)',
+                    border: selectedCredential?.email === cred.email
+                      ? '2px solid white'
+                      : '2px solid transparent',
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s',
+                    textAlign: 'left'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.25)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = selectedCredential?.email === cred.email 
+                      ? 'rgba(255,255,255,0.3)' 
+                      : 'rgba(255,255,255,0.1)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ 
+                        fontWeight: 'bold',
+                        fontSize: '16px',
+                        marginBottom: '5px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}>
+                        <span style={{
+                          width: '10px',
+                          height: '10px',
+                          borderRadius: '50%',
+                          background: cred.color,
+                          marginRight: '10px',
+                          display: 'inline-block'
+                        }}></span>
+                        {cred.role}
                       </div>
-                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                      <div style={{ fontSize: '13px', opacity: 0.9 }}>
+                        {cred.email} • {cred.password}
+                      </div>
                     </div>
-                  </button>
-                ))}
-              </CardContent>
-            </Card>
+                    <span style={{ fontSize: '20px' }}>→</span>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Right side - Auth Form */}
-        <div className="lg:w-1/2 p-8 lg:p-12 flex items-center justify-center bg-white/50 backdrop-blur-sm">
-          <Card className="w-full max-w-md shadow-xl border-0 bg-white">
-            <CardHeader className="space-y-1 pb-6">
-              <CardTitle className="text-2xl font-bold text-center">
-                {isLogin ? 'Welcome Back' : 'Create Account'}
-              </CardTitle>
-              <CardDescription className="text-center">
-                {isLogin 
-                  ? 'Enter your credentials to access your account' 
-                  : 'Join our humanitarian network'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {!isLogin && (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="firstName">First Name</Label>
-                        <div className="relative">
-                          <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                          <Input
-                            id="firstName"
-                            name="firstName"
-                            type="text"
-                            required={!isLogin}
-                            value={formData.firstName}
-                            onChange={handleInputChange}
-                            className="pl-9"
-                            placeholder="John"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="lastName">Last Name</Label>
-                        <div className="relative">
-                          <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                          <Input
-                            id="lastName"
-                            name="lastName"
-                            type="text"
-                            required={!isLogin}
-                            value={formData.lastName}
-                            onChange={handleInputChange}
-                            className="pl-9"
-                            placeholder="Doe"
-                          />
-                        </div>
-                      </div>
+        {/* Right Panel - Login Form */}
+        <div style={{
+          flex: 1,
+          padding: '50px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center'
+        }}>
+          <div style={{ maxWidth: '400px', width: '100%', margin: '0 auto' }}>
+            <h2 style={{ 
+              fontSize: '32px',
+              fontWeight: 'bold',
+              marginBottom: '10px',
+              color: '#1a1a1a'
+            }}>
+              {isLogin ? 'Welcome Back' : 'Create Account'}
+            </h2>
+            <p style={{ 
+              color: '#666',
+              marginBottom: '30px'
+            }}>
+              {isLogin 
+                ? 'Enter your credentials to access your account' 
+                : 'Join our humanitarian network'}
+            </p>
+
+            <form onSubmit={handleSubmit}>
+              {!isLogin && (
+                <>
+                  <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ 
+                        display: 'block',
+                        marginBottom: '8px',
+                        color: '#333',
+                        fontSize: '14px',
+                        fontWeight: '500'
+                      }}>
+                        First Name
+                      </label>
+                      <input
+                        type="text"
+                        name="firstName"
+                        required={!isLogin}
+                        value={formData.firstName}
+                        onChange={handleInputChange}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '2px solid #e5e5e5',
+                          borderRadius: '8px',
+                          fontSize: '16px',
+                          transition: 'border-color 0.3s'
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                        onBlur={(e) => e.target.style.borderColor = '#e5e5e5'}
+                      />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="organizationName">Organization (Optional)</Label>
-                      <div className="relative">
-                        <Building2 className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          id="organizationName"
-                          name="organizationName"
-                          type="text"
-                          placeholder="Your organization name"
-                          value={formData.organizationName}
-                          onChange={handleInputChange}
-                          className="pl-9"
-                        />
-                      </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ 
+                        display: 'block',
+                        marginBottom: '8px',
+                        color: '#333',
+                        fontSize: '14px',
+                        fontWeight: '500'
+                      }}>
+                        Last Name
+                      </label>
+                      <input
+                        type="text"
+                        name="lastName"
+                        required={!isLogin}
+                        value={formData.lastName}
+                        onChange={handleInputChange}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '2px solid #e5e5e5',
+                          borderRadius: '8px',
+                          fontSize: '16px',
+                          transition: 'border-color 0.3s'
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                        onBlur={(e) => e.target.style.borderColor = '#e5e5e5'}
+                      />
                     </div>
-                  </>
-                )}
-                
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      required
-                      value={formData.email}
+                  </div>
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ 
+                      display: 'block',
+                      marginBottom: '8px',
+                      color: '#333',
+                      fontSize: '14px',
+                      fontWeight: '500'
+                    }}>
+                      Organization (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      name="organizationName"
+                      value={formData.organizationName}
                       onChange={handleInputChange}
-                      className="pl-9"
-                      placeholder="you@example.com"
+                      placeholder="Your organization name"
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        border: '2px solid #e5e5e5',
+                        borderRadius: '8px',
+                        fontSize: '16px',
+                        transition: 'border-color 0.3s'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                      onBlur={(e) => e.target.style.borderColor = '#e5e5e5'}
                     />
                   </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="password"
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      className="pl-9 pr-10"
-                      placeholder="••••••••"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  {!isLogin && (
-                    <p className="text-xs text-gray-500">
-                      Min 8 chars with uppercase, lowercase, number & special character
-                    </p>
-                  )}
-                </div>
+                </>
+              )}
 
-                {message && (
-                  <Alert className={message.type === 'success' ? 'border-green-200' : 'border-red-200'}>
-                    <AlertDescription className={message.type === 'success' ? 'text-green-700' : 'text-red-700'}>
-                      {message.text}
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                <Button 
-                  type="submit" 
-                  className="w-full bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600" 
-                  disabled={loading}
-                >
-                  {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}
-                </Button>
-              </form>
-            </CardContent>
-            <CardFooter className="flex flex-col space-y-4">
-              <div className="relative w-full">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-gray-500">Or</span>
-                </div>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ 
+                  display: 'block',
+                  marginBottom: '8px',
+                  color: '#333',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}>
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  required
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  placeholder="you@example.com"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '2px solid #e5e5e5',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    transition: 'border-color 0.3s'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                  onBlur={(e) => e.target.style.borderColor = '#e5e5e5'}
+                />
               </div>
-              
-              <Button
-                variant="outline"
-                className="w-full"
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ 
+                  display: 'block',
+                  marginBottom: '8px',
+                  color: '#333',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}>
+                  Password
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    required
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    placeholder="••••••••"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      paddingRight: '45px',
+                      border: '2px solid #e5e5e5',
+                      borderRadius: '8px',
+                      fontSize: '16px',
+                      transition: 'border-color 0.3s'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                    onBlur={(e) => e.target.style.borderColor = '#e5e5e5'}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '5px',
+                      color: '#666'
+                    }}
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+                {!isLogin && (
+                  <p style={{ 
+                    marginTop: '8px',
+                    fontSize: '12px',
+                    color: '#666'
+                  }}>
+                    Min 8 chars with uppercase, lowercase, number & special character
+                  </p>
+                )}
+              </div>
+
+              {message && (
+                <div style={{
+                  padding: '12px',
+                  borderRadius: '8px',
+                  marginBottom: '20px',
+                  background: message.type === 'success' ? '#10b981' : '#ef4444',
+                  color: 'white',
+                  fontSize: '14px'
+                }}>
+                  {message.text}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  background: loading ? '#999' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  transition: 'transform 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  if (!loading) e.currentTarget.style.transform = 'translateY(-2px)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }}
+              >
+                {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}
+              </button>
+            </form>
+
+            <div style={{
+              textAlign: 'center',
+              marginTop: '30px',
+              paddingTop: '30px',
+              borderTop: '1px solid #e5e5e5'
+            }}>
+              <button
                 onClick={() => {
                   setIsLogin(!isLogin)
                   setMessage(null)
@@ -388,39 +539,21 @@ export default function Home() {
                     organizationName: ''
                   })
                 }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#667eea',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
               >
                 {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
-              </Button>
-            </CardFooter>
-          </Card>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes blob {
-          0% {
-            transform: translate(0px, 0px) scale(1);
-          }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-          100% {
-            transform: translate(0px, 0px) scale(1);
-          }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-      `}</style>
-    </main>
+    </div>
   )
 }

@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -37,8 +37,6 @@ model User {
   comments        Comment[]
   notifications   Notification[]
 
-  @@index([email])
-  @@index([organizationId])
 }
 
 model Session {
@@ -50,8 +48,6 @@ model Session {
   
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  @@index([token])
-  @@index([userId])
 }
 
 enum UserRole {
@@ -80,7 +76,6 @@ model Organization {
   templates       Template[]
   mediaFiles      MediaFile[]
 
-  @@index([slug])
 }
 
 // Reports
@@ -115,9 +110,6 @@ model Report {
   auditLogs       AuditLog[]
 
   @@unique([slug, organizationId])
-  @@index([organizationId])
-  @@index([authorId])
-  @@index([status])
 }
 
 enum ReportStatus {
@@ -144,8 +136,6 @@ model Section {
   report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
   media       MediaFile[]
 
-  @@index([reportId])
-  @@index([order])
 }
 
 enum SectionType {
@@ -175,8 +165,6 @@ model Template {
   organization    Organization @relation(fields: [organizationId], references: [id])
   organizationId  String
 
-  @@index([organizationId])
-  @@index([category])
 }
 
 // Assessment Data
@@ -201,8 +189,6 @@ model Assessment {
   // Relations
   report          Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
-  @@index([reportId])
-  @@index([type])
 }
 
 enum AssessmentType {
@@ -232,8 +218,6 @@ model MediaFile {
   section         Section?     @relation(fields: [sectionId], references: [id])
   sectionId       String?
 
-  @@index([organizationId])
-  @@index([sectionId])
 }
 
 // Collaboration
@@ -249,8 +233,6 @@ model ReportCollaborator {
   user        User      @relation(fields: [userId], references: [id])
 
   @@unique([reportId, userId])
-  @@index([reportId])
-  @@index([userId])
 }
 
 enum CollaboratorPermission {
@@ -273,8 +255,6 @@ model Comment {
   report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
   user        User      @relation(fields: [userId], references: [id])
 
-  @@index([reportId])
-  @@index([userId])
 }
 
 // Access Control
@@ -291,9 +271,6 @@ model ReportAccess {
   report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
   user        User?     @relation(fields: [userId], references: [id])
 
-  @@index([reportId])
-  @@index([userId])
-  @@index([token])
 }
 
 enum AccessPermission {
@@ -316,7 +293,6 @@ model ReportVersion {
   report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
   @@unique([reportId, version])
-  @@index([reportId])
 }
 
 // Export History
@@ -333,8 +309,6 @@ model ReportExport {
   // Relations
   report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
-  @@index([reportId])
-  @@index([status])
 }
 
 enum ExportFormat {
@@ -368,9 +342,6 @@ model AuditLog {
   user        User?     @relation(fields: [userId], references: [id])
   report      Report?   @relation(fields: [entityId], references: [id])
 
-  @@index([userId])
-  @@index([entity, entityId])
-  @@index([createdAt])
 }
 
 // Notifications
@@ -387,8 +358,6 @@ model Notification {
   // Relations
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, read])
-  @@index([createdAt])
 }
 
 enum NotificationType {

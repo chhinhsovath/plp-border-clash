@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { 
   ArrowLeft,
   Save,
@@ -17,8 +19,11 @@ import {
   Home,
   Activity,
   CheckCircle,
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from 'lucide-react'
+import { createIndividualSchema, type CreateIndividualInput } from '@/lib/schemas'
+import { getDefaultValues } from '@/lib/validation/form-utils'
 
 interface Site {
   id: string
@@ -34,49 +39,30 @@ interface Household {
 
 export default function IndividualRegistration() {
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   const [sites, setSites] = useState<Site[]>([])
   const [households, setHouseholds] = useState<Household[]>([])
   const [activeTab, setActiveTab] = useState(0)
   
-  // Form data
-  const [formData, setFormData] = useState({
-    // Basic Information
-    fullLegalName: '',
-    commonlyUsedName: '',
-    dateOfBirth: '',
-    gender: 'MALE',
-    
-    // Demographics
-    nationality: '',
-    ethnicGroup: '',
-    motherTongue: '',
-    preDisplacementAddress: '',
-    villageOfOrigin: '',
-    contactNumber: '',
-    
-    // Location
-    currentSiteId: '',
-    zoneBlock: '',
-    shelterNumber: '',
-    householdId: '',
-    isHeadOfHousehold: false,
-    createNewHousehold: true,
-    
-    // Vulnerability Indicators
-    unaccompaniedMinor: false,
-    separatedChild: false,
-    singleHeadedHH: false,
-    pregnant: false,
-    pregnancyDueDate: '',
-    lactatingMother: false,
-    hasDisability: false,
-    disabilityDetails: '',
-    elderly: false,
-    chronicallyIll: false,
-    illnessDetails: ''
+  // Initialize form with Zod schema
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors, isSubmitting },
+    reset
+  } = useForm<CreateIndividualInput>({
+    resolver: zodResolver(createIndividualSchema),
+    defaultValues: getDefaultValues(createIndividualSchema)
   })
+  
+  // Watch specific fields for conditional logic
+  const dateOfBirth = watch('dateOfBirth')
+  const pregnant = watch('pregnant')
+  const hasDisability = watch('hasDisability')
+  const chronicallyIll = watch('chronicallyIll')
+  const createNewHousehold = watch('createNewHousehold')
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -85,10 +71,24 @@ export default function IndividualRegistration() {
       return
     }
     
-    // Fetch sites
     fetchSites()
     fetchHouseholds()
   }, [router])
+
+  useEffect(() => {
+    // Auto-calculate elderly status based on age
+    if (dateOfBirth) {
+      const age = calculateAge(dateOfBirth)
+      setValue('elderly', age >= 60)
+      
+      // Set unaccompanied minor only if age < 18
+      if (age < 18) {
+        // Keep existing value
+      } else {
+        setValue('unaccompaniedMinor', false)
+      }
+    }
+  }, [dateOfBirth, setValue])
 
   const fetchSites = async () => {
     try {
@@ -137,1042 +137,572 @@ export default function IndividualRegistration() {
     return age
   }
 
-  const handleDateOfBirthChange = (value: string) => {
-    setFormData(prev => {
-      const age = calculateAge(value)
-      return {
-        ...prev,
-        dateOfBirth: value,
-        elderly: age >= 60,
-        unaccompaniedMinor: age < 18 && prev.unaccompaniedMinor
-      }
-    })
-  }
-
-  const handleSubmit = async () => {
-    setLoading(true)
-    setMessage(null)
-
+  const onSubmit = async (data: CreateIndividualInput) => {
     try {
-      // Validate required fields
-      if (!formData.fullLegalName || !formData.dateOfBirth || !formData.currentSiteId) {
-        throw new Error('Please fill in all required fields')
-      }
-
       const response = await fetch('/api/registration/individuals', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          ...formData,
-          householdId: formData.createNewHousehold ? null : formData.householdId
-        })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to register individual')
-      }
-
-      setMessage({ 
-        type: 'success', 
-        text: `Successfully registered ${formData.fullLegalName} with ID: ${data.data.individualCode}` 
+        body: JSON.stringify(data)
       })
       
-      // Clear form for next registration
-      setTimeout(() => {
-        if (window.confirm('Would you like to register another individual?')) {
-          // Reset form but keep site and household info
-          setFormData(prev => ({
-            ...prev,
-            fullLegalName: '',
-            commonlyUsedName: '',
-            dateOfBirth: '',
-            contactNumber: '',
-            shelterNumber: '',
-            // Reset vulnerability flags
-            unaccompaniedMinor: false,
-            separatedChild: false,
-            singleHeadedHH: false,
-            pregnant: false,
-            pregnancyDueDate: '',
-            lactatingMother: false,
-            hasDisability: false,
-            disabilityDetails: '',
-            elderly: false,
-            chronicallyIll: false,
-            illnessDetails: ''
-          }))
-          setActiveTab(0)
-          setMessage(null)
-        } else {
-          router.push('/registration/individuals')
-        }
-      }, 2000)
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message })
-    } finally {
-      setLoading(false)
+      const result = await response.json()
+      
+      if (response.ok) {
+        setMessage({
+          type: 'success',
+          text: `Individual registered successfully with code: ${result.data.individualCode}`
+        })
+        
+        // Reset form after successful submission
+        reset()
+        
+        // Redirect after 3 seconds
+        setTimeout(() => {
+          router.push('/data-collection')
+        }, 3000)
+      } else {
+        setMessage({
+          type: 'error',
+          text: result.error || 'Failed to register individual'
+        })
+      }
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: 'An error occurred while registering'
+      })
     }
   }
 
   const tabs = [
     { name: 'Basic Information', icon: User },
-    { name: 'Demographics', icon: Users },
     { name: 'Location', icon: MapPin },
-    { name: 'Vulnerability', icon: Shield }
+    { name: 'Vulnerability', icon: Shield },
+    { name: 'Additional Info', icon: Activity }
   ]
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    }}>
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div style={{
-        background: 'rgba(255, 255, 255, 0.95)',
-        backdropFilter: 'blur(10px)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
-        padding: '20px 30px'
-      }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            <button
-              onClick={() => router.push('/registration')}
-              style={{
-                padding: '10px',
-                background: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <ArrowLeft size={20} />
-              Back
-            </button>
-            <div>
-              <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#111827' }}>
-                Individual Registration
-              </h1>
-              <p style={{ fontSize: '14px', color: '#6b7280' }}>
-                Register new individuals in the humanitarian database
-              </p>
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center">
+              <button
+                onClick={() => router.push('/data-collection')}
+                className="mr-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <h1 className="text-xl font-semibold">Individual Registration</h1>
             </div>
           </div>
-          
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            style={{
-              padding: '12px 24px',
-              background: loading ? '#9ca3af' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontSize: '14px',
-              fontWeight: '600'
-            }}
-          >
-            <Save size={18} />
-            {loading ? 'Registering...' : 'Register Individual'}
-          </button>
         </div>
       </div>
 
-      {/* Message */}
-      {message && (
-        <div style={{
-          maxWidth: '1200px',
-          margin: '20px auto',
-          padding: '15px',
-          borderRadius: '8px',
-          background: message.type === 'success' ? '#10b981' : '#ef4444',
-          color: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px'
-        }}>
-          {message.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
-          {message.text}
-        </div>
-      )}
-
       {/* Main Content */}
-      <div style={{ maxWidth: '1200px', margin: '30px auto', padding: '0 30px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '250px 1fr', gap: '30px' }}>
-          {/* Tabs Navigation */}
-          <div style={{
-            background: 'white',
-            borderRadius: '12px',
-            padding: '20px',
-            height: 'fit-content'
-          }}>
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Message Alert */}
+        {message && (
+          <div className={`mb-6 p-4 rounded-lg flex items-start ${
+            message.type === 'success' 
+              ? 'bg-green-50 text-green-800 border border-green-200' 
+              : 'bg-red-50 text-red-800 border border-red-200'
+          }`}>
+            {message.type === 'success' ? (
+              <CheckCircle className="h-5 w-5 mt-0.5 mr-3 flex-shrink-0" />
+            ) : (
+              <AlertCircle className="h-5 w-5 mt-0.5 mr-3 flex-shrink-0" />
+            )}
+            <p>{message.text}</p>
+          </div>
+        )}
+
+        {/* Tab Navigation */}
+        <div className="bg-white rounded-lg shadow-sm mb-6">
+          <div className="flex border-b">
             {tabs.map((tab, index) => {
               const Icon = tab.icon
               return (
                 <button
-                  key={tab.name}
+                  key={index}
                   onClick={() => setActiveTab(index)}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    marginBottom: '8px',
-                    background: activeTab === index ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'transparent',
-                    color: activeTab === index ? 'white' : '#6b7280',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    fontSize: '14px',
-                    fontWeight: activeTab === index ? '600' : '400',
-                    transition: 'all 0.2s'
-                  }}
+                  className={`flex-1 flex items-center justify-center px-4 py-3 text-sm font-medium transition-colors ${
+                    activeTab === index
+                      ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
                 >
-                  <Icon size={18} />
+                  <Icon className="h-4 w-4 mr-2" />
                   {tab.name}
-                  {activeTab === index && <ChevronRight size={16} style={{ marginLeft: 'auto' }} />}
                 </button>
               )
             })}
           </div>
+        </div>
 
-          {/* Form Content */}
-          <div style={{
-            background: 'white',
-            borderRadius: '12px',
-            padding: '30px'
-          }}>
-            {/* Basic Information Tab */}
-            {activeTab === 0 && (
-              <div>
-                <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '25px', color: '#111827' }}>
-                  Basic Information
-                </h2>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      marginBottom: '8px',
-                      color: '#374151',
-                      fontSize: '14px',
-                      fontWeight: '500'
-                    }}>
-                      Full Legal Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.fullLegalName}
-                      onChange={(e) => setFormData({ ...formData, fullLegalName: e.target.value })}
-                      placeholder="As per documentation"
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      marginBottom: '8px',
-                      color: '#374151',
-                      fontSize: '14px',
-                      fontWeight: '500'
-                    }}>
-                      Commonly Used Name
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.commonlyUsedName}
-                      onChange={(e) => setFormData({ ...formData, commonlyUsedName: e.target.value })}
-                      placeholder="Nickname or preferred name"
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      marginBottom: '8px',
-                      color: '#374151',
-                      fontSize: '14px',
-                      fontWeight: '500'
-                    }}>
-                      Date of Birth *
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.dateOfBirth}
-                      onChange={(e) => handleDateOfBirthChange(e.target.value)}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                    />
-                    {formData.dateOfBirth && (
-                      <p style={{ marginTop: '4px', fontSize: '12px', color: '#6b7280' }}>
-                        Age: {calculateAge(formData.dateOfBirth)} years
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      marginBottom: '8px',
-                      color: '#374151',
-                      fontSize: '14px',
-                      fontWeight: '500'
-                    }}>
-                      Gender *
-                    </label>
-                    <select
-                      value={formData.gender}
-                      onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        background: 'white'
-                      }}
-                    >
-                      <option value="MALE">Male</option>
-                      <option value="FEMALE">Female</option>
-                      <option value="OTHER">Other</option>
-                    </select>
-                  </div>
+        {/* Form */}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Basic Information Tab */}
+          {activeTab === 0 && (
+            <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Full Legal Name *
+                  </label>
+                  <input
+                    {...register('fullLegalName')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter full legal name"
+                  />
+                  {errors.fullLegalName && (
+                    <p className="mt-1 text-sm text-red-600">{errors.fullLegalName.message}</p>
+                  )}
                 </div>
 
-                <button
-                  onClick={() => setActiveTab(1)}
-                  style={{
-                    marginTop: '30px',
-                    padding: '12px 24px',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}
-                >
-                  Next: Demographics
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            )}
-
-            {/* Demographics Tab */}
-            {activeTab === 1 && (
-              <div>
-                <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '25px', color: '#111827' }}>
-                  Demographics & Contact
-                </h2>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      marginBottom: '8px',
-                      color: '#374151',
-                      fontSize: '14px',
-                      fontWeight: '500'
-                    }}>
-                      Nationality *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.nationality}
-                      onChange={(e) => setFormData({ ...formData, nationality: e.target.value })}
-                      placeholder="e.g., Cambodian"
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      marginBottom: '8px',
-                      color: '#374151',
-                      fontSize: '14px',
-                      fontWeight: '500'
-                    }}>
-                      Ethnic Group
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.ethnicGroup}
-                      onChange={(e) => setFormData({ ...formData, ethnicGroup: e.target.value })}
-                      placeholder="Optional"
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      marginBottom: '8px',
-                      color: '#374151',
-                      fontSize: '14px',
-                      fontWeight: '500'
-                    }}>
-                      Mother Tongue
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.motherTongue}
-                      onChange={(e) => setFormData({ ...formData, motherTongue: e.target.value })}
-                      placeholder="Primary language"
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      marginBottom: '8px',
-                      color: '#374151',
-                      fontSize: '14px',
-                      fontWeight: '500'
-                    }}>
-                      <Phone size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                      Contact Number
-                    </label>
-                    <input
-                      type="tel"
-                      value={formData.contactNumber}
-                      onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
-                      placeholder="If available"
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <label style={{
-                      display: 'block',
-                      marginBottom: '8px',
-                      color: '#374151',
-                      fontSize: '14px',
-                      fontWeight: '500'
-                    }}>
-                      Village of Origin
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.villageOfOrigin}
-                      onChange={(e) => setFormData({ ...formData, villageOfOrigin: e.target.value })}
-                      placeholder="Original village/town before displacement"
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <label style={{
-                      display: 'block',
-                      marginBottom: '8px',
-                      color: '#374151',
-                      fontSize: '14px',
-                      fontWeight: '500'
-                    }}>
-                      Pre-Displacement Address
-                    </label>
-                    <textarea
-                      value={formData.preDisplacementAddress}
-                      onChange={(e) => setFormData({ ...formData, preDisplacementAddress: e.target.value })}
-                      placeholder="Full address before displacement"
-                      rows={2}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        resize: 'vertical'
-                      }}
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Commonly Used Name
+                  </label>
+                  <input
+                    {...register('commonlyUsedName')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter commonly used name"
+                  />
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px', marginTop: '30px' }}>
-                  <button
-                    onClick={() => setActiveTab(0)}
-                    style={{
-                      padding: '12px 24px',
-                      background: 'white',
-                      color: '#6b7280',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '600'
-                    }}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date of Birth *
+                  </label>
+                  <input
+                    {...register('dateOfBirth')}
+                    type="date"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  {errors.dateOfBirth && (
+                    <p className="mt-1 text-sm text-red-600">{errors.dateOfBirth.message}</p>
+                  )}
+                  {dateOfBirth && (
+                    <p className="mt-1 text-sm text-gray-500">
+                      Age: {calculateAge(dateOfBirth)} years
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Gender *
+                  </label>
+                  <select
+                    {...register('gender')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() => setActiveTab(2)}
-                    style={{
-                      padding: '12px 24px',
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    Next: Location
-                    <ChevronRight size={16} />
-                  </button>
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                  {errors.gender && (
+                    <p className="mt-1 text-sm text-red-600">{errors.gender.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nationality *
+                  </label>
+                  <input
+                    {...register('nationality')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter nationality"
+                  />
+                  {errors.nationality && (
+                    <p className="mt-1 text-sm text-red-600">{errors.nationality.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Ethnic Group
+                  </label>
+                  <input
+                    {...register('ethnicGroup')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter ethnic group"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Mother Tongue
+                  </label>
+                  <input
+                    {...register('motherTongue')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter mother tongue"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Contact Number
+                  </label>
+                  <input
+                    {...register('contactNumber')}
+                    type="tel"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter contact number"
+                  />
+                  {errors.contactNumber && (
+                    <p className="mt-1 text-sm text-red-600">{errors.contactNumber.message}</p>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Location Tab */}
-            {activeTab === 2 && (
-              <div>
-                <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '25px', color: '#111827' }}>
-                  Location & Household
-                </h2>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      marginBottom: '8px',
-                      color: '#374151',
-                      fontSize: '14px',
-                      fontWeight: '500'
-                    }}>
-                      <MapPin size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                      Current Site *
+          {/* Location Tab */}
+          {activeTab === 1 && (
+            <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Current Site *
+                  </label>
+                  <select
+                    {...register('currentSiteId')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Select a site</option>
+                    {sites.map(site => (
+                      <option key={site.id} value={site.id}>
+                        {site.name} ({site.siteCode})
+                      </option>
+                    ))}
+                  </select>
+                  {errors.currentSiteId && (
+                    <p className="mt-1 text-sm text-red-600">{errors.currentSiteId.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Zone/Block
+                  </label>
+                  <input
+                    {...register('zoneBlock')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter zone or block"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Shelter Number
+                  </label>
+                  <input
+                    {...register('shelterNumber')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter shelter number"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center mb-2">
+                    <input
+                      {...register('createNewHousehold')}
+                      type="checkbox"
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label className="ml-2 block text-sm text-gray-700">
+                      Create new household
                     </label>
+                  </div>
+                  
+                  {!createNewHousehold && (
                     <select
-                      value={formData.currentSiteId}
-                      onChange={(e) => setFormData({ ...formData, currentSiteId: e.target.value })}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        background: 'white'
-                      }}
+                      {...register('householdId')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      <option value="">Select site</option>
-                      {sites.map(site => (
-                        <option key={site.id} value={site.id}>
-                          {site.name} ({site.siteCode})
+                      <option value="">Select household</option>
+                      {households.map(household => (
+                        <option key={household.id} value={household.id}>
+                          {household.householdCode} (Size: {household.size})
                         </option>
                       ))}
                     </select>
-                  </div>
+                  )}
+                </div>
 
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      marginBottom: '8px',
-                      color: '#374151',
-                      fontSize: '14px',
-                      fontWeight: '500'
-                    }}>
-                      Zone/Block
-                    </label>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Pre-Displacement Address
+                  </label>
+                  <input
+                    {...register('preDisplacementAddress')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter previous address"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Village of Origin
+                  </label>
+                  <input
+                    {...register('villageOfOrigin')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter village of origin"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <div className="flex items-center">
                     <input
-                      type="text"
-                      value={formData.zoneBlock}
-                      onChange={(e) => setFormData({ ...formData, zoneBlock: e.target.value })}
-                      placeholder="e.g., Zone A, Block 3"
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
+                      {...register('isHeadOfHousehold')}
+                      type="checkbox"
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      marginBottom: '8px',
-                      color: '#374151',
-                      fontSize: '14px',
-                      fontWeight: '500'
-                    }}>
-                      <Home size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                      Shelter Number
+                    <label className="ml-2 block text-sm text-gray-700">
+                      Is head of household
                     </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Vulnerability Tab */}
+          {activeTab === 2 && (
+            <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center">
                     <input
-                      type="text"
-                      value={formData.shelterNumber}
-                      onChange={(e) => setFormData({ ...formData, shelterNumber: e.target.value })}
-                      placeholder="e.g., T-123"
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
+                      {...register('unaccompaniedMinor')}
+                      type="checkbox"
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
+                    <label className="ml-2 block text-sm text-gray-700">
+                      Unaccompanied Minor
+                    </label>
                   </div>
 
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <div style={{
-                      padding: '15px',
-                      background: '#f3f4f6',
-                      borderRadius: '8px',
-                      marginBottom: '20px'
-                    }}>
-                      <label style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        cursor: 'pointer',
-                        marginBottom: '10px'
-                      }}>
-                        <input
-                          type="radio"
-                          name="householdOption"
-                          checked={formData.createNewHousehold}
-                          onChange={() => setFormData({ ...formData, createNewHousehold: true, householdId: '' })}
-                        />
-                        <span style={{ fontSize: '14px', fontWeight: '500' }}>Create new household</span>
-                      </label>
-                      <label style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        cursor: 'pointer'
-                      }}>
-                        <input
-                          type="radio"
-                          name="householdOption"
-                          checked={!formData.createNewHousehold}
-                          onChange={() => setFormData({ ...formData, createNewHousehold: false })}
-                        />
-                        <span style={{ fontSize: '14px', fontWeight: '500' }}>Add to existing household</span>
-                      </label>
-                    </div>
+                  <div className="flex items-center">
+                    <input
+                      {...register('separatedChild')}
+                      type="checkbox"
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label className="ml-2 block text-sm text-gray-700">
+                      Separated Child
+                    </label>
+                  </div>
 
-                    {!formData.createNewHousehold && (
-                      <div>
-                        <label style={{
-                          display: 'block',
-                          marginBottom: '8px',
-                          color: '#374151',
-                          fontSize: '14px',
-                          fontWeight: '500'
-                        }}>
-                          <Users size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                          Select Household
-                        </label>
-                        <select
-                          value={formData.householdId}
-                          onChange={(e) => setFormData({ ...formData, householdId: e.target.value })}
-                          style={{
-                            width: '100%',
-                            padding: '12px',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '8px',
-                            fontSize: '14px',
-                            background: 'white'
-                          }}
-                        >
-                          <option value="">Select household</option>
-                          {households.map(household => (
-                            <option key={household.id} value={household.id}>
-                              {household.householdCode} (Size: {household.size})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
+                  <div className="flex items-center">
+                    <input
+                      {...register('singleHeadedHH')}
+                      type="checkbox"
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label className="ml-2 block text-sm text-gray-700">
+                      Single-Headed Household
+                    </label>
+                  </div>
 
-                    <label style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      marginTop: '15px',
-                      cursor: 'pointer'
-                    }}>
+                  <div className="flex items-center">
+                    <input
+                      {...register('pregnant')}
+                      type="checkbox"
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label className="ml-2 block text-sm text-gray-700">
+                      Pregnant
+                    </label>
+                  </div>
+
+                  {pregnant && (
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Pregnancy Due Date
+                      </label>
                       <input
-                        type="checkbox"
-                        checked={formData.isHeadOfHousehold}
-                        onChange={(e) => setFormData({ ...formData, isHeadOfHousehold: e.target.checked })}
-                        style={{ width: '18px', height: '18px' }}
+                        {...register('pregnancyDueDate')}
+                        type="date"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
-                      <span style={{ fontSize: '14px', fontWeight: '500' }}>
-                        Head of Household
-                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center">
+                    <input
+                      {...register('lactatingMother')}
+                      type="checkbox"
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label className="ml-2 block text-sm text-gray-700">
+                      Lactating Mother
                     </label>
                   </div>
-                </div>
 
-                <div style={{ display: 'flex', gap: '10px', marginTop: '30px' }}>
-                  <button
-                    onClick={() => setActiveTab(1)}
-                    style={{
-                      padding: '12px 24px',
-                      background: 'white',
-                      color: '#6b7280',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '600'
-                    }}
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() => setActiveTab(3)}
-                    style={{
-                      padding: '12px 24px',
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    Next: Vulnerability Assessment
-                    <ChevronRight size={16} />
-                  </button>
+                  <div className="flex items-center">
+                    <input
+                      {...register('hasDisability')}
+                      type="checkbox"
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label className="ml-2 block text-sm text-gray-700">
+                      Has Disability
+                    </label>
+                  </div>
+
+                  {hasDisability && (
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Disability Details
+                      </label>
+                      <textarea
+                        {...register('disabilityDetails')}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Describe the disability"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex items-center">
+                    <input
+                      {...register('elderly')}
+                      type="checkbox"
+                      disabled
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label className="ml-2 block text-sm text-gray-700">
+                      Elderly (60+) - Auto-calculated
+                    </label>
+                  </div>
+
+                  <div className="flex items-center">
+                    <input
+                      {...register('chronicallyIll')}
+                      type="checkbox"
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label className="ml-2 block text-sm text-gray-700">
+                      Chronically Ill
+                    </label>
+                  </div>
+
+                  {chronicallyIll && (
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Illness Details
+                      </label>
+                      <textarea
+                        {...register('illnessDetails')}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Describe the illness"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Vulnerability Tab */}
-            {activeTab === 3 && (
-              <div>
-                <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '25px', color: '#111827' }}>
-                  Vulnerability Assessment
-                </h2>
-                
-                <div style={{
-                  padding: '15px',
-                  background: '#fef3c7',
-                  border: '1px solid #fbbf24',
-                  borderRadius: '8px',
-                  marginBottom: '25px'
-                }}>
-                  <p style={{ fontSize: '14px', color: '#92400e' }}>
-                    <AlertCircle size={16} style={{ display: 'inline', marginRight: '8px' }} />
-                    Please carefully assess all vulnerability indicators. This information is crucial for protection and assistance prioritization.
-                  </p>
+          {/* Additional Info Tab */}
+          {activeTab === 3 && (
+            <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Education Level
+                  </label>
+                  <select
+                    {...register('educationLevel')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Select education level</option>
+                    <option value="NONE">None</option>
+                    <option value="PRIMARY">Primary</option>
+                    <option value="SECONDARY">Secondary</option>
+                    <option value="TERTIARY">Tertiary</option>
+                    <option value="VOCATIONAL">Vocational</option>
+                  </select>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {/* Child Protection */}
-                  <div style={{
-                    padding: '20px',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px'
-                  }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '15px', color: '#374151' }}>
-                      <Baby size={18} style={{ display: 'inline', marginRight: '8px' }} />
-                      Child Protection
-                    </h3>
-                    
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={formData.unaccompaniedMinor}
-                          onChange={(e) => setFormData({ ...formData, unaccompaniedMinor: e.target.checked })}
-                          style={{ width: '18px', height: '18px' }}
-                        />
-                        <span style={{ fontSize: '14px' }}>Unaccompanied Minor (under 18, no adult caregiver)</span>
-                      </label>
-                      
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={formData.separatedChild}
-                          onChange={(e) => setFormData({ ...formData, separatedChild: e.target.checked })}
-                          style={{ width: '18px', height: '18px' }}
-                        />
-                        <span style={{ fontSize: '14px' }}>Separated Child (separated from parents but with adult)</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Women & Family */}
-                  <div style={{
-                    padding: '20px',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px'
-                  }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '15px', color: '#374151' }}>
-                      <Heart size={18} style={{ display: 'inline', marginRight: '8px' }} />
-                      Women & Family
-                    </h3>
-                    
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={formData.singleHeadedHH}
-                          onChange={(e) => setFormData({ ...formData, singleHeadedHH: e.target.checked })}
-                          style={{ width: '18px', height: '18px' }}
-                        />
-                        <span style={{ fontSize: '14px' }}>Single-Headed Household</span>
-                      </label>
-                      
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={formData.pregnant}
-                          onChange={(e) => setFormData({ ...formData, pregnant: e.target.checked })}
-                          style={{ width: '18px', height: '18px' }}
-                        />
-                        <span style={{ fontSize: '14px' }}>Pregnant</span>
-                      </label>
-                      
-                      {formData.pregnant && (
-                        <div style={{ marginLeft: '28px' }}>
-                          <label style={{
-                            display: 'block',
-                            marginBottom: '8px',
-                            color: '#374151',
-                            fontSize: '14px',
-                            fontWeight: '500'
-                          }}>
-                            Estimated Due Date
-                          </label>
-                          <input
-                            type="date"
-                            value={formData.pregnancyDueDate}
-                            onChange={(e) => setFormData({ ...formData, pregnancyDueDate: e.target.value })}
-                            style={{
-                              padding: '8px 12px',
-                              border: '1px solid #e5e7eb',
-                              borderRadius: '6px',
-                              fontSize: '14px'
-                            }}
-                          />
-                        </div>
-                      )}
-                      
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={formData.lactatingMother}
-                          onChange={(e) => setFormData({ ...formData, lactatingMother: e.target.checked })}
-                          style={{ width: '18px', height: '18px' }}
-                        />
-                        <span style={{ fontSize: '14px' }}>Lactating Mother</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Health & Disability */}
-                  <div style={{
-                    padding: '20px',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px'
-                  }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '15px', color: '#374151' }}>
-                      <Activity size={18} style={{ display: 'inline', marginRight: '8px' }} />
-                      Health & Disability
-                    </h3>
-                    
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={formData.hasDisability}
-                          onChange={(e) => setFormData({ ...formData, hasDisability: e.target.checked })}
-                          style={{ width: '18px', height: '18px' }}
-                        />
-                        <span style={{ fontSize: '14px' }}>Person with Disability</span>
-                      </label>
-                      
-                      {formData.hasDisability && (
-                        <div style={{ marginLeft: '28px' }}>
-                          <textarea
-                            value={formData.disabilityDetails}
-                            onChange={(e) => setFormData({ ...formData, disabilityDetails: e.target.value })}
-                            placeholder="Describe the disability and support needs"
-                            rows={2}
-                            style={{
-                              width: '100%',
-                              padding: '8px 12px',
-                              border: '1px solid #e5e7eb',
-                              borderRadius: '6px',
-                              fontSize: '14px',
-                              resize: 'vertical'
-                            }}
-                          />
-                        </div>
-                      )}
-                      
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={formData.elderly}
-                          disabled={formData.dateOfBirth && calculateAge(formData.dateOfBirth) >= 60}
-                          onChange={(e) => setFormData({ ...formData, elderly: e.target.checked })}
-                          style={{ width: '18px', height: '18px' }}
-                        />
-                        <span style={{ fontSize: '14px' }}>
-                          Elderly (60+ years)
-                          {formData.elderly && ' - Auto-detected'}
-                        </span>
-                      </label>
-                      
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={formData.chronicallyIll}
-                          onChange={(e) => setFormData({ ...formData, chronicallyIll: e.target.checked })}
-                          style={{ width: '18px', height: '18px' }}
-                        />
-                        <span style={{ fontSize: '14px' }}>Chronically Ill</span>
-                      </label>
-                      
-                      {formData.chronicallyIll && (
-                        <div style={{ marginLeft: '28px' }}>
-                          <textarea
-                            value={formData.illnessDetails}
-                            onChange={(e) => setFormData({ ...formData, illnessDetails: e.target.value })}
-                            placeholder="Describe the chronic condition(s)"
-                            rows={2}
-                            style={{
-                              width: '100%',
-                              padding: '8px 12px',
-                              border: '1px solid #e5e7eb',
-                              borderRadius: '6px',
-                              fontSize: '14px',
-                              resize: 'vertical'
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px', marginTop: '30px' }}>
-                  <button
-                    onClick={() => setActiveTab(2)}
-                    style={{
-                      padding: '12px 24px',
-                      background: 'white',
-                      color: '#6b7280',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '600'
-                    }}
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={handleSubmit}
-                    disabled={loading}
-                    style={{
-                      padding: '12px 24px',
-                      background: loading ? '#9ca3af' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: loading ? 'not-allowed' : 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    <Save size={18} />
-                    {loading ? 'Registering...' : 'Complete Registration'}
-                  </button>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    {...register('notes')}
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Any additional notes or observations"
+                  />
                 </div>
               </div>
-            )}
+            </div>
+          )}
+
+          {/* Form Actions */}
+          <div className="flex justify-between pt-6">
+            <button
+              type="button"
+              onClick={() => router.push('/data-collection')}
+              className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            
+            <div className="flex gap-3">
+              {activeTab > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(activeTab - 1)}
+                  className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Previous
+                </button>
+              )}
+              
+              {activeTab < tabs.length - 1 ? (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(activeTab + 1)}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Registering...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Register Individual
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   )

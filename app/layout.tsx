@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Hanuman, Inter } from "next/font/google";
+import { ErrorBoundary } from "@/components/error-boundary";
 import "./globals.css";
 
 const hanuman = Hanuman({
@@ -30,7 +31,9 @@ export default function RootLayout({
       <body
         className={`${hanuman.variable} ${inter.variable} font-sans antialiased`}
       >
-        {children}
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
       </body>
     </html>
   );

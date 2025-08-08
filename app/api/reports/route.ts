@@ -1,36 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
-import { z } from 'zod'
 import jwt from 'jsonwebtoken'
-
-const createReportSchema = z.object({
-  title: z.string().min(1),
-  description: z.string().optional(),
-  templateId: z.string().optional(),
-  status: z.enum(['DRAFT', 'IN_REVIEW', 'APPROVED', 'PUBLISHED', 'ARCHIVED']).optional(),
-  reportType: z.string().optional(),
-  location: z.string().optional(),
-  coordinates: z.object({
-    lat: z.string().optional(),
-    lng: z.string().optional()
-  }).optional(),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
-  affectedPeople: z.string().optional(),
-  households: z.string().optional(),
-  methodology: z.string().optional(),
-  teamMembers: z.array(z.string()).optional(),
-  sectors: z.array(z.string()).optional(),
-  findings: z.string().optional(),
-  recommendations: z.string().optional(),
-  sections: z.array(z.object({
-    id: z.string(),
-    type: z.string(),
-    title: z.string(),
-    content: z.string().optional(),
-    order: z.number()
-  })).optional()
-})
+import { 
+  createReportSchema, 
+  reportQuerySchema,
+  apiSuccessSchema,
+  paginatedApiResponseSchema,
+  reportSchema,
+  apiErrorSchema
+} from '@/lib/schemas'
+import { getEnv } from '@/lib/schemas/env.schema'
 
 // GET /api/reports - Get all reports for the user's organization
 export async function GET(request: NextRequest) {
@@ -45,7 +24,8 @@ export async function GET(request: NextRequest) {
     
     let decoded: any
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+      const env = getEnv()
+      decoded = jwt.verify(token, env.JWT_SECRET) as any
     } catch (jwtError: any) {
       console.error('JWT verification failed:', jwtError.message)
       return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
@@ -94,9 +74,26 @@ export async function GET(request: NextRequest) {
       }
     })
     
+    // Parse query parameters for pagination
+    const { searchParams } = new URL(request.url)
+    const queryParams = Object.fromEntries(searchParams.entries())
+    const query = reportQuerySchema.parse(queryParams)
+    
+    // Calculate pagination
+    const skip = (query.page - 1) * query.limit
+    const total = await prisma.report.count({ where: { organizationId } })
+    
     return NextResponse.json({
       success: true,
-      data: reports
+      data: reports,
+      pagination: {
+        page: query.page,
+        limit: query.limit,
+        total,
+        totalPages: Math.ceil(total / query.limit),
+        hasNext: skip + query.limit < total,
+        hasPrev: query.page > 1
+      }
     })
   } catch (error) {
     console.error('Error fetching reports:', error)
@@ -124,7 +121,8 @@ export async function POST(request: NextRequest) {
     
     let decoded: any
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+      const env = getEnv()
+      decoded = jwt.verify(token, env.JWT_SECRET) as any
       console.log('Token decoded successfully:', decoded)
     } catch (jwtError: any) {
       console.error('JWT verification failed:', jwtError.message)

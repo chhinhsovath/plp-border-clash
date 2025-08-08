@@ -9,6 +9,7 @@ export function middleware(request: NextRequest) {
     '/api/auth/register',
     '/api/auth/forgot-password',
     '/api/health',
+    '/api/ping',
   ]
   
   const isPublicPath = publicPaths.some(path => 

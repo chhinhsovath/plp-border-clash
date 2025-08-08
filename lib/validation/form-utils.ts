@@ -225,7 +225,9 @@ export function getDefaultValues<T extends z.ZodObject<any>>(
     const field = shape[key]
     
     if (field instanceof z.ZodDefault) {
-      defaults[key] = field._def.defaultValue()
+      defaults[key] = typeof field._def.defaultValue === 'function' 
+        ? field._def.defaultValue() 
+        : field._def.defaultValue
     } else if (field instanceof z.ZodOptional) {
       defaults[key] = undefined
     } else if (field instanceof z.ZodString) {

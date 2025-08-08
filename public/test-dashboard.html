@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Style Test</title>
+  <script>
+    // Set test authentication data in localStorage
+    const testUser = {
+      id: "test-user",
+      email: "admin@hrs.openplp.com",
+      firstName: "Admin",
+      lastName: "User",
+      role: "ADMIN",
+      organizationId: "default-org-id"
+    };
+    const testToken = "test-token-for-dashboard-access";
+    
+    localStorage.setItem('user', JSON.stringify(testUser));
+    localStorage.setItem('token', testToken);
+    
+    // Redirect to dashboard
+    window.location.href = '/dashboard';
+  </script>
+</head>
+<body>
+  <p>Setting authentication and redirecting to dashboard...</p>
+</body>
+</html>

@@ -21,21 +21,61 @@ async function main() {
   })
   console.log('Created organization:', organization.name)
 
-  // Create admin user
-  const hashedPassword = await bcrypt.hash('Admin@123', 10)
-  const adminUser = await prisma.user.create({
-    data: {
+  // Create test users
+  const users = [
+    {
+      email: 'super@hrs.openplp.com',
+      password: 'Super@123',
+      firstName: 'Super',
+      lastName: 'Admin',
+      role: 'ADMIN'
+    },
+    {
       email: 'admin@hrs.openplp.com',
-      password: hashedPassword,
+      password: 'Admin@123',
       firstName: 'Admin',
       lastName: 'User',
-      role: 'ADMIN',
-      isActive: true,
-      emailVerified: true,
-      organizationId: organization.id
+      role: 'ADMIN'
+    },
+    {
+      email: 'manager@hrs.openplp.com',
+      password: 'Manager@123',
+      firstName: 'Manager',
+      lastName: 'User',
+      role: 'MANAGER'
+    },
+    {
+      email: 'dataentry@hrs.openplp.com',
+      password: 'DataEntry@123',
+      firstName: 'Data',
+      lastName: 'Entry',
+      role: 'DATA_ENTRY'
+    },
+    {
+      email: 'viewer@hrs.openplp.com',
+      password: 'Viewer@123',
+      firstName: 'Viewer',
+      lastName: 'User',
+      role: 'VIEWER'
     }
-  })
-  console.log('Created admin user:', adminUser.email)
+  ]
+
+  for (const userData of users) {
+    const hashedPassword = await bcrypt.hash(userData.password, 10)
+    const user = await prisma.user.create({
+      data: {
+        email: userData.email,
+        password: hashedPassword,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        role: userData.role as any,
+        isActive: true,
+        emailVerified: true,
+        organizationId: organization.id
+      }
+    })
+    console.log(`Created ${userData.role} user:`, user.email)
+  }
 
   // Create sample site
   const site = await prisma.site.create({
